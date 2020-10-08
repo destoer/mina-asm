@@ -5,14 +5,36 @@
 S-type: [group(4)][opcode(4)][src1(4)][src2 (4)][dest(4)][ SBZ  (4)][ SBZ  (8)]
 I-type: [group(4)][opcode(4)][src1(4)][shift(4)][dest(4)][ imm  (4)][ imm  (8)]
 M-type: [group(4)][opcode(4)][SBZ (4)][ imm (4)][dest(4)][ imm  (4)][ imm  (8)]
-F-type: [group(4)][opcode(4)][src1(4)][src2 (4)][dest(4)][rshift(4)][ SBZ  (8)]
+F-type: [group(4)][opcode(4)][src1(4)][src2 (4)][dest(4)][rshift(4)][ SBZ  (8)] // only for funnel shifts
 B-type: [group(4)][opcode(4)][              offset             (16)][offset(8)]
 */
 
+enum class instr_type
+{
+    S,
+    I,
+    M,
+    F,
+    B
+};
+
+// this will give us the info we need on our instr
+// for now we will just try make this generic but may have to
+// go down the path of using function pointers down the line
+// i.e when we want mov to auto decode operands
 struct Instr
 {
+    Instr(int g, int o, instr_type t) : type(t), group(g),opcode(o)
+    {
 
+    }
 
+    instr_type type;
+
+    int group;
+    int opcode;
+
+    
 };
 
 struct Symbol
@@ -64,7 +86,7 @@ private:
 
     const std::unordered_map<std::string, Instr> instr_table = 
     {
-        {"mov",Instr()}
+        {"mov",Instr(0b0101,0b1000,instr_type::S)}
     };
 
     const std::unordered_map<std::string, Directive> directive_table;
@@ -278,7 +300,14 @@ uint32_t Assembler::assemble_opcode(std::string instr)
     const auto tokens = parse_tokens(instr);
 
     
-    dump_token_debug(tokens);
+    //dump_token_debug(tokens);
+
+    // for now assume token is in instr in pratcice
+    // we need a parse line function that dispatches on the first token type
+    // and asserts we actually got any
+
+    // ok pick up switching on the instr type tomorrow
+    //switch(instr_type)
 
     return 0xfff;
 }
