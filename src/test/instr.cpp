@@ -12,7 +12,7 @@ void instr_test()
 {
     Assembler assembler;
 
-    for(int i = 0; i < INSTR_TEST_SIZE; i++)
+    for(uint32_t i = 0; i < INSTR_TEST_SIZE; i++)
     {
         const auto test = instr_test_table[i];
         const auto tokens = assembler.parse_tokens(test.line);

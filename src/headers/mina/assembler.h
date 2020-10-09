@@ -25,9 +25,9 @@ struct Instr
 
     instr_type type;
 
-    int group;
-    int opcode;
-    int operand_count;
+    uint32_t group;
+    uint32_t opcode;
+    uint32_t operand_count;
     
 };
 

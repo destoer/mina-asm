@@ -277,7 +277,7 @@ void Assembler::assemble_line(std::string instr)
 
             default:
             {
-                printf("unknown token start %d\n",tokens[0].type);
+                printf("unknown token start %d\n",static_cast<int>(tokens[0].type));
                 exit(1);
             }
         }
@@ -309,7 +309,7 @@ uint32_t Assembler::assemble_opcode(std::string instr,std::vector<Token> tokens)
                 }
 
                 // verfiy all operands are registers
-                for(int i = 1; i < instr_entry.operand_count; i++)
+                for(size_t i = 1; i < instr_entry.operand_count; i++)
                 {
                     if(tokens[i].type != token_type::reg)
                     {

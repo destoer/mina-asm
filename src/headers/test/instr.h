@@ -54,7 +54,7 @@ struct Opcode
 
             default:
             {
-                printf("test unhandled instr decode: %d\n",type);
+                printf("test unhandled instr decode: %d\n",static_cast<int>(type));
                 exit(1);
             }
         }
