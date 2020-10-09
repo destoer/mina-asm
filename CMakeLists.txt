@@ -19,7 +19,8 @@ endif()
 file(GLOB src_files
 	"src/*.h"
 	"src/*.cpp"
-
+	"src/mina/*.h"
+	"src/mina/*.cpp"
 )
 
 #includes 
