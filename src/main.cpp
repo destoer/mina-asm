@@ -24,7 +24,9 @@ enum class instr_type
 // i.e when we want mov to auto decode operands
 struct Instr
 {
-    Instr(int g, int o, instr_type t) : type(t), group(g),opcode(o)
+    Instr() {}
+    Instr(int g, int o,int c, instr_type t) : 
+        type(t), group(g), opcode(o), operand_count(c)
     {
 
     }
@@ -33,7 +35,7 @@ struct Instr
 
     int group;
     int opcode;
-
+    int operand_count;
     
 };
 
@@ -80,18 +82,19 @@ public:
     
 private:
     std::vector<Token> parse_tokens(std::string instr);
-    uint32_t assemble_opcode(std::string instr);
+    void assemble_line(std::string line);
+    uint32_t assemble_opcode(std::string instr,std::vector<Token> tokens);
 
     std::string file;
 
-    const std::unordered_map<std::string, Instr> instr_table = 
+    std::unordered_map<std::string, Instr> instr_table = 
     {
-        {"mov",Instr(0b0101,0b1000,instr_type::S)}
+        {"mov",Instr(0b0101,0b1000,2,instr_type::S)}
     };
 
     const std::unordered_map<std::string, Directive> directive_table;
 
-    const std::unordered_map<std::string, uint32_t> register_table = 
+    std::unordered_map<std::string, uint32_t> register_table = 
     {
         {"r0", 0},
         {"r1", 1},
@@ -140,7 +143,7 @@ void Assembler::assemble_file()
     std::string line;
     while(getline(file_stream,line))
     {
-        printf("op: %s = %08x\n",line.c_str(),assemble_opcode(line));
+        assemble_line(line);
     }
 }
 
@@ -295,21 +298,93 @@ void dump_token_debug(std::vector<Token> tokens)
     }
 }
 
-uint32_t Assembler::assemble_opcode(std::string instr)
+void Assembler::assemble_line(std::string instr)
 {
     const auto tokens = parse_tokens(instr);
 
+    // nothing to do
+    if(tokens.size() == 0)
+    {
+        return;
+    }
+
+    else
+    {
+        switch(tokens[0].type)
+        {
+            case token_type::instr:
+            {
+                const auto opcode = assemble_opcode(instr,tokens);
+                printf("op: %s = %08x\n",instr.c_str(),opcode);
+                break;
+            }
+
+            default:
+            {
+                printf("unknown token start %d\n",tokens[0].type);
+                exit(1);
+            }
+        }
+    }
+}
+
+uint32_t Assembler::assemble_opcode(std::string instr,std::vector<Token> tokens)
+{
     
     //dump_token_debug(tokens);
+   
+    const auto instr_entry = instr_table[tokens[0].literal];
 
-    // for now assume token is in instr in pratcice
-    // we need a parse line function that dispatches on the first token type
-    // and asserts we actually got any
+    // every opcode has the group and opcode field
+    uint32_t opcode = (instr_entry.group << 28) | (instr_entry.opcode << 24);
 
-    // ok pick up switching on the instr type tomorrow
-    //switch(instr_type)
+    switch(instr_entry.type)
+    {
+        default:
+        {
+            case instr_type::S:
+            {
+                // verify we actually have enough operands to assemble this
+                if(instr_entry.operand_count > tokens.size()-1)
+                {
+                    printf("[S-type-instr] operands missing where expected");
+                    exit(1);
+                }
 
-    return 0xfff;
+                // verfiy all operands are registers
+                for(int i = 1; i < instr_entry.operand_count; i++)
+                {
+                    if(tokens[i].type != token_type::reg)
+                    {
+                        printf("[s-type-instr] expected register operand");
+                        exit(1);
+                    }
+                }
+
+
+                switch(instr_entry.operand_count)
+                {
+                    case 2: // src2 empty, dest = op1, src1 = op2
+                    {
+                        opcode |= (register_table[tokens[1].literal] << 8) | 
+                            (register_table[tokens[2].literal] << 16);
+                        break;
+                    }
+
+                    default: 
+                    {
+                        printf("S type unhandled operand count %d\n",instr_entry.operand_count);
+                        break;
+                    }
+                }
+                break;
+            }
+
+            break;
+        }
+    }
+
+    return opcode;
 }
 
 int main(int argc, char *argv[])
