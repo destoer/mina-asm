@@ -21,6 +21,8 @@ file(GLOB src_files
 	"src/*.cpp"
 	"src/mina/*.h"
 	"src/mina/*.cpp"
+	"src/test/*.h"
+	"src/test/*.cpp"
 )
 
 #includes 

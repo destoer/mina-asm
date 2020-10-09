@@ -13,6 +13,11 @@ B-type: [group(4)][opcode(4)][              offset             (16)][offset(8)]
 
 Assembler::Assembler(std::string filename)
 {
+    init(filename);
+}
+
+void Assembler::init(std::string filename)
+{
     file = read_file(filename);
 
     std::cout << "file: " << file << "\n";
@@ -23,7 +28,7 @@ Assembler::Assembler(std::string filename)
         exit(1);
     }
 
-    offset = 0;
+    offset = 0;    
 }
 
 // first assembler pass resolve all symbols and figure out required size of the binary
@@ -68,6 +73,12 @@ void Assembler::first_pass()
 
 void Assembler::assemble_file()
 {
+    if(file == "")
+    {
+        printf("assembler: no file loaded");
+        return;
+    }
+
     first_pass();
 
     offset = 0;

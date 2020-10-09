@@ -1,4 +1,5 @@
 #include <headers/lib.h>
+#include <test/test.h>
 #include <mina/assembler.h>
 
 int main(int argc, char *argv[])
@@ -11,6 +12,7 @@ int main(int argc, char *argv[])
 
     if(std::string(argv[1]) == "-t")
     {
+        run_tests();
         return 0;
     }
 
