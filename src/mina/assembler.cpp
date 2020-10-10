@@ -156,9 +156,7 @@ bool verify_immediate_internal(const std::string &instr, std::string &literal, s
     return true;
 }
 
-// not being parsed properly verify tests for it 
-// and write branch ones
-// then onto immediateaa operand instrucitons
+
 bool verify_immediate(const std::string &instr, std::string &literal)
 {
     const auto len = instr.size();
