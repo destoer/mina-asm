@@ -52,6 +52,12 @@ struct Opcode
                 break;
             }
 
+            case instr_type::B:
+            {
+                op1 = op & (set_bit(0,24) - 1);
+                break;
+            }
+
             default:
             {
                 printf("test unhandled instr decode: %d\n",static_cast<int>(type));

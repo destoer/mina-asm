@@ -33,7 +33,13 @@ struct Instr
 
 struct Symbol
 {
+    Symbol() {}
+    Symbol(uint32_t v) : value(v)
+    {
+        
+    }
 
+    uint32_t value;
 };
 
 struct Directive
@@ -62,39 +68,45 @@ struct Token
     std::string literal;
 };
 
-
+void dump_token_debug(std::vector<Token> tokens);
+bool verify_immediate(const std::string &instr, std::string &literal);
 
 class Assembler
 {
 public:
     Assembler() {};
 
-    Assembler(std::string filename);
-    void init(std::string filename);
+    Assembler(const std::string &filename);
+    void init(const std::string &filename);
     
     void assemble_file();
-    uint32_t assemble_opcode(std::string instr,std::vector<Token> tokens);
+    uint32_t assemble_opcode(const std::string &instr,const std::vector<Token> &tokens);
 
-    void write_binary(std::string filename);
-    std::vector<Token> parse_tokens(std::string instr);
+    void write_binary(const std::string &filename);
+    std::vector<Token> parse_tokens(const std::string &instr);
 
     // where we are actually dumping the assembled data
     std::vector<uint8_t> output;
 
-    bool instr_exists(std::string instr) const
+    bool instr_exists(const std::string &instr) const
     {
         return instr_table.count(instr);
     }
 
-    Instr get_instr_entry(std::string instr)
+    Instr get_instr_entry(const std::string &instr)
     {
         return instr_table[instr];
     }
 
 private:
-    void assemble_line(std::string line);
+    void assemble_line(const std::string &line);
 
     void first_pass();
+
+    void dump_symbol_table_debug();
+
+    uint32_t decode_s_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
+    uint32_t decode_b_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
 
     std::string file = "";
 
@@ -142,6 +154,9 @@ private:
         {"rlsr",Instr(0b0110,0b1001,3,instr_type::S)},
         {"rasr",Instr(0b0110,0b1010,3,instr_type::S)},
         {"rror",Instr(0b0110,0b1011,3,instr_type::S)},
+
+        // branch pc reliatve (group 1000)
+        {"bra",Instr(0b1000,0b0000,1,instr_type::B)}
     };
 
 

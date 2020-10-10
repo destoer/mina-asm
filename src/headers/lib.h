@@ -88,3 +88,29 @@ inline void write_file(const std::string &filename, std::vector<uint8_t> &buf)
 
     fp.write((char*)buf.data(),buf.size());
 }
+
+
+inline bool is_set(uint64_t reg, int bit) noexcept
+{
+	return ((reg >> bit) & 1);
+}
+
+inline uint64_t set_bit(uint64_t v,int bit) noexcept
+{
+    return v | (1 << bit);
+}
+
+
+inline uint64_t deset_bit(uint64_t v,int bit) noexcept
+{
+    return v & ~(1 << bit);
+}
+
+//https://stackoverflow.com/questions/42534749/signed-extension-from-24-bit-to-32-bit-in-c
+template<typename T>
+T sign_extend(T x, int b)
+{
+	T res = 1;
+	res <<= b - 1;
+	return (x ^ res) - res;
+}

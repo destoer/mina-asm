@@ -11,16 +11,16 @@ B-type: [group(4)][opcode(4)][              offset             (16)][offset(8)]
 
 
 
-Assembler::Assembler(std::string filename)
+Assembler::Assembler(const std::string &filename)
 {
     init(filename);
 }
 
-void Assembler::init(std::string filename)
+void Assembler::init(const std::string &filename)
 {
     file = read_file(filename);
 
-    std::cout << "file: " << file << "\n";
+    std::cout << "file: " << "\n" << file << "\n\n";
 
     if(file == "")
     {
@@ -52,11 +52,40 @@ void Assembler::first_pass()
             continue;
         }
 
-        switch(tokens[0].type)
+        auto token = tokens[0];
+
+        switch(token.type)
         {
             case token_type::instr:
             {
                 offset += 4; // fixed size instr all are 4 bytes
+                break;
+            }
+
+            // potential label definiton
+            case token_type::sym:
+            {
+                // search for a ':'
+                // if we dont find it then it is invalid
+                const auto idx = token.literal.find(':');
+                if(idx == std::string::npos)
+                {
+                    printf("unknown instr: %s(%s)\n",token.literal.c_str(),line.c_str());
+                    exit(1);
+                }
+
+
+                // valid label add it to the symbol table if not allready defined
+                if(symbol_table.count(token.literal))
+                {
+                    printf("redefinition of symbol: %s\n",token.literal.c_str());
+                    exit(1);
+                }
+
+                token.literal = token.literal.substr(0,idx); 
+
+                symbol_table[token.literal] = Symbol(offset);
+
                 break;
             }
 
@@ -94,12 +123,109 @@ void Assembler::assemble_file()
     }
 }
 
-void Assembler::write_binary(std::string filename)
+void Assembler::write_binary(const std::string &filename)
 {
     write_file(filename,output);
 }
 
-std::vector<Token> Assembler::parse_tokens(std::string instr)
+template<typename F>
+bool verify_immediate_internal(const std::string &instr, std::string &literal, size_t i, F lambda)
+{
+    const auto len = instr.size();
+
+    while(i < len)
+    {
+        if(lambda(instr[i]))
+        {
+            literal += instr[i++];
+        }
+
+        // token terminated
+        else if(literal[i] == ',' || literal[i] == ' ')
+        {
+            break;
+        }
+
+        else
+        {
+            return false;
+        }
+
+    }
+
+    return true;
+}
+
+// not being parsed properly verify tests for it 
+// and write branch ones
+// then onto immediateaa operand instrucitons
+bool verify_immediate(const std::string &instr, std::string &literal)
+{
+    const auto len = instr.size();
+
+    if(!len)
+    {
+        return false;
+    }
+
+    if(!isdigit(instr[0]))
+    {
+        return false;
+    }
+
+    literal = std::string(1,instr[0]);
+    size_t i = 1;
+
+    // if we only have one digit we can just bail out
+    if(i < len)
+    {
+        const auto prefix = instr.substr(0,2);
+
+        const bool is_hex = prefix == "0x";
+        const bool is_bin = prefix == "0b";
+
+        // we have a prefix and another char after it
+        // check the next char incase the literal is in hex
+        // or binary in which case we will skip over it
+        if( (is_hex || is_bin) && (i + 1) < len)
+        {
+            i++;
+
+            // verify we have a valid hex number
+            if(is_hex)
+            {
+                literal += 'x';
+                return verify_immediate_internal(instr,literal,i,[](const char c) 
+                {
+                    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+                });
+            }
+
+            // verify its ones or zeros
+            else
+            {
+                literal += 'b';
+                return verify_immediate_internal(instr,literal,i,[](const char c) 
+                {
+                    return c == '0' || c == '1';
+                });
+            }
+        }
+
+        // verify we have all digits
+        else
+        {
+            return verify_immediate_internal(instr,literal,i,[](const char c) 
+            {
+                return c >= '0' && c <= '9';
+            });
+        }
+    }
+
+    return true;    
+}
+
+std::vector<Token> Assembler::parse_tokens(const std::string &instr)
 {
     std::vector<Token> tokens;
 
@@ -141,9 +267,20 @@ std::vector<Token> Assembler::parse_tokens(std::string instr)
                 // start of immediate
                 if(isdigit(c))
                 {
-                    // if it begins with a zero
-                    // check the next char incase the literal is in hex
-                    puts("immediate unhandled");
+                    std::string literal = "";
+
+                    i -= 1;
+                    const auto success = verify_immediate(instr.substr(i),literal);
+
+                    if(!success)
+                    {
+                        printf("invalid immediate: %s\n",instr.c_str());
+                        exit(1);
+                    }
+
+                    i += literal.size();
+
+                    tokens.push_back(Token(literal,token_type::imm));
                 }
 
                 else if(isalpha(c))
@@ -179,16 +316,12 @@ std::vector<Token> Assembler::parse_tokens(std::string instr)
                         tokens.push_back(Token(literal,token_type::reg));
                     }
 
-                    else if(symbol_table.count(literal))
+                    else
                     {
                         tokens.push_back(Token(literal,token_type::sym));
                     }
                     
-                    else
-                    {
-                        printf("unrecognised symbol: %s\n",literal.c_str());
-                        exit(1);
-                    }
+
 
                 }
 
@@ -249,7 +382,17 @@ void dump_token_debug(std::vector<Token> tokens)
     }
 }
 
-void Assembler::assemble_line(std::string instr)
+void Assembler::dump_symbol_table_debug()
+{
+    puts("symbol table:\n");
+
+    for(const auto &s : symbol_table)
+    {
+        printf("%s = %x\n",s.first.c_str(),s.second.value);
+    }
+}
+
+void Assembler::assemble_line(const std::string &instr)
 {
     const auto tokens = parse_tokens(instr);
 
@@ -271,7 +414,13 @@ void Assembler::assemble_line(std::string instr)
 
                 offset += 4; // instr size of 4
 
-                printf("op: %s = %08x\n",instr.c_str(),opcode);
+                printf("%s = %08x\n",instr.c_str(),opcode);
+                break;
+            }
+
+            // label start (dont care)
+            case token_type::sym:
+            {
                 break;
             }
 
@@ -284,7 +433,122 @@ void Assembler::assemble_line(std::string instr)
     }
 }
 
-uint32_t Assembler::assemble_opcode(std::string instr,std::vector<Token> tokens)
+uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
+{
+    uint32_t opcode = 0;
+
+    // verify we actually have enough operands to assemble this
+    if(instr_entry.operand_count != tokens.size()-1)
+    {
+        printf("[S-type-instr] expected %d operands got %zd (%s)\n",
+            instr_entry.operand_count,tokens.size()-1,instr.c_str());
+        exit(1);
+    }
+
+    // verfiy all operands are registers
+    for(size_t i = 1; i < instr_entry.operand_count; i++)
+    {
+        if(tokens[i].type != token_type::reg)
+        {
+            printf("[S-type-instr] expected register operand");
+            exit(1);
+        }
+    }
+
+
+    switch(instr_entry.operand_count)
+    {
+        case 1: // dest = op1, everything else zero
+        {
+            opcode |= register_table[tokens[1].literal] << 12;
+            break;
+        }
+
+
+        case 2: // src2 empty, dest = op1, src1 = op2
+        {
+            opcode |= (register_table[tokens[1].literal] << 12) | 
+                (register_table[tokens[2].literal] << 20);
+            break;
+        }
+
+        case 3: // dest = op1, src1 = op2, src2 = op3
+        {
+            opcode |= (register_table[tokens[1].literal] << 12) | 
+                (register_table[tokens[2].literal] << 20) |
+                (register_table[tokens[3].literal] << 16);                        
+            break;
+        }
+
+        default: 
+        {
+            printf("S type unhandled operand count %d(%s)\n",instr_entry.operand_count,instr.c_str());
+            break;
+        }
+    }    
+
+    return opcode;
+}
+
+uint32_t Assembler::decode_b_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
+{   
+    UNUSED(instr_entry);
+
+    uint32_t opcode = 0;
+
+    // we should only have one operand for a branch
+    if(tokens.size() -1 != 1)
+    {
+        printf("branch: expected 1 operand but got: %zd\n",tokens.size()-1);
+        exit(1);
+    }
+
+    int32_t v;
+    // ok now we have two options we can either get a immediate or a symbol
+    if(tokens[1].type == token_type::sym)
+    {
+        if(!symbol_table.count(tokens[1].literal))
+        {
+            printf("unrecognised symbol: %s(%s)\n",
+                tokens[1].literal.c_str(),instr.c_str());
+            exit(1);
+        }
+
+        const uint32_t cur = offset;
+        const auto target = symbol_table[tokens[1].literal].value;
+        v = target - cur;
+    }
+
+    else if(tokens[1].type == token_type::imm)
+    {
+        v = std::stoi(tokens[1].literal);
+    }
+    
+    else
+    {
+        printf("invalid operand for branch: %s(%s)\n",tokens[1].literal.c_str(),instr.c_str());
+        exit(1);
+    }
+
+
+    const auto sign = is_set(v,(sizeof(v)*8)-1);
+    const int32_t branch =  (v >> 2) & (set_bit(0,24) - 1);        
+    const int32_t final_branch = sign? set_bit(branch,23) : deset_bit(branch,23);
+
+    //24 bit imm added to pc to reach target
+    // left shifed by two then sign extended
+    if(abs(v) > set_bit(0,22))
+    {
+        printf("cannot represent relative branch in 26 bit signed op: %x\n",v);
+        exit(1);
+    }
+
+    opcode |= final_branch;
+
+    return opcode;
+}
+
+uint32_t Assembler::assemble_opcode(const std::string &instr,const std::vector<Token> &tokens)
 {
     
     //dump_token_debug(tokens);
@@ -296,64 +560,29 @@ uint32_t Assembler::assemble_opcode(std::string instr,std::vector<Token> tokens)
 
     switch(instr_entry.type)
     {
-        default:
+
+        case instr_type::S: // register to register opcodes
         {
-            case instr_type::S: // register to register opcodes
-            {
-                // verify we actually have enough operands to assemble this
-                if(instr_entry.operand_count != tokens.size()-1)
-                {
-                    printf("[S-type-instr] expected %d operands got %zd (%s)\n",
-                        instr_entry.operand_count,tokens.size()-1,instr.c_str());
-                    exit(1);
-                }
-
-                // verfiy all operands are registers
-                for(size_t i = 1; i < instr_entry.operand_count; i++)
-                {
-                    if(tokens[i].type != token_type::reg)
-                    {
-                        printf("[S-type-instr] expected register operand");
-                        exit(1);
-                    }
-                }
-
-
-                switch(instr_entry.operand_count)
-                {
-                    case 1: // dest = op1, everything else zero
-                    {
-                        opcode |= register_table[tokens[1].literal] << 12;
-                        break;
-                    }
-
-
-                    case 2: // src2 empty, dest = op1, src1 = op2
-                    {
-                        opcode |= (register_table[tokens[1].literal] << 12) | 
-                            (register_table[tokens[2].literal] << 20);
-                        break;
-                    }
-
-                    case 3: // dest = op1, src1 = op2, src2 = op3
-                    {
-                        opcode |= (register_table[tokens[1].literal] << 12) | 
-                            (register_table[tokens[2].literal] << 20) |
-                            (register_table[tokens[3].literal] << 16);                        
-                        break;
-                    }
-
-                    default: 
-                    {
-                        printf("S type unhandled operand count %d\n",instr_entry.operand_count);
-                        break;
-                    }
-                }
-                break;
-            }
-
+            opcode |= decode_s_instr(instr_entry,instr,tokens);
             break;
         }
+
+
+        case instr_type::B: // relative branch
+        {
+            opcode |= decode_b_instr(instr_entry,instr,tokens);
+            break;
+        }
+
+        default:
+        {
+            printf("unhandled opcode type: %d(%s)\n",static_cast<int>(instr_entry.type),instr.c_str());
+            dump_symbol_table_debug();
+            exit(1);
+        }
+
+        break;
+        
     }
 
     return opcode;

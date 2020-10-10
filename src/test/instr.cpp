@@ -1,11 +1,15 @@
 #include <test/instr.h>
 
-static constexpr uint32_t INSTR_TEST_SIZE = 3;
+static constexpr uint32_t INSTR_TEST_SIZE = 4;
 InstrTest instr_test_table[INSTR_TEST_SIZE] = 
 {
+    // mov tests
     {Opcode(0b0101,0b1000,5,0,0), "mov r0, r5"},
     {Opcode(0b0101,0b1001,2,0,4), "mt r4, r2"},
-    {Opcode(0b0101,0b1100,0,0,15), "mfrc sp"}
+    {Opcode(0b0101,0b1100,0,0,15), "mfrc sp"},
+
+    // branch rel tests
+    {Opcode(0b1000,0b0000,550000 >> 2),"bra 550000"}
 };
 
 void instr_test()
