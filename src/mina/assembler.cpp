@@ -129,28 +129,22 @@ void Assembler::write_binary(const std::string &filename)
 }
 
 template<typename F>
-bool verify_immediate_internal(const std::string &instr, std::string &literal, size_t i, F lambda)
+bool verify_immediate_internal(const std::string &instr, size_t &i, F lambda)
 {
     const auto len = instr.size();
 
-    while(i < len)
+    for(; i < len; i++)
     {
-        if(lambda(instr[i]))
-        {
-            literal += instr[i++];
-        }
-
         // token terminated
-        else if(literal[i] == ',' || literal[i] == ' ')
+        if(instr[i] == ',' || instr[i] == ' ')
         {
             break;
         }
 
-        else
+        if(!lambda(instr[i]))
         {
             return false;
         }
-
     }
 
     return true;
@@ -161,66 +155,89 @@ bool verify_immediate(const std::string &instr, std::string &literal)
 {
     const auto len = instr.size();
 
+    // an empty immediate aint much use to us
     if(!len)
     {
         return false;
     }
 
-    if(!isdigit(instr[0]))
+    size_t i = 0;
+
+    const auto c = instr[0];
+
+    // allow - or +
+    if(c == '-' || c == '+')
     {
-        return false;
-    }
-
-    literal = std::string(1,instr[0]);
-    size_t i = 1;
-
-    // if we only have one digit we can just bail out
-    if(i < len)
-    {
-        const auto prefix = instr.substr(0,2);
-
-        const bool is_hex = prefix == "0x";
-        const bool is_bin = prefix == "0b";
-
-        // we have a prefix and another char after it
-        // check the next char incase the literal is in hex
-        // or binary in which case we will skip over it
-        if( (is_hex || is_bin) && (i + 1) < len)
+        i = 1;
+        // no digit after the sign is of no use
+        if(len == 1)
         {
-            i++;
-
-            // verify we have a valid hex number
-            if(is_hex)
-            {
-                literal += 'x';
-                return verify_immediate_internal(instr,literal,i,[](const char c) 
-                {
-                    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
-                });
-            }
-
-            // verify its ones or zeros
-            else
-            {
-                literal += 'b';
-                return verify_immediate_internal(instr,literal,i,[](const char c) 
-                {
-                    return c == '0' || c == '1';
-                });
-            }
-        }
-
-        // verify we have all digits
-        else
-        {
-            return verify_immediate_internal(instr,literal,i,[](const char c) 
-            {
-                return c >= '0' && c <= '9';
-            });
+            return false;
         }
     }
 
-    return true;    
+    bool valid = false;
+
+
+    // have prefix + one more digit at minimum
+    const auto prefix = i+2 < len?  instr.substr(i,2) : "";
+
+    // verify we have a valid hex number
+    if(prefix == "0x")
+    {
+        // skip past the prefix
+        i += 2;
+        valid = verify_immediate_internal(instr,i,[](const char c) 
+        {
+            return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+        });
+    }
+
+    // verify its ones or zeros
+    else if(prefix == "0b")
+    {
+        // skip past the prefix
+        i += 2;                
+        valid = verify_immediate_internal(instr,i,[](const char c) 
+        {
+            return c == '0' || c == '1';
+        });
+    }
+
+    // verify we have all digits
+    else
+    {
+        valid = verify_immediate_internal(instr,i,[](const char c) 
+        {
+            return c >= '0' && c <= '9';
+        });
+    }
+    
+
+    if(valid)
+    {
+        literal = instr.substr(0,i);
+    }
+
+    return valid;    
+}
+
+void Assembler::decode_imm(std::string instr, size_t &i,std::vector<Token> &tokens)
+{
+    std::string literal = "";
+
+    i -= 1;
+    const auto success = verify_immediate(instr.substr(i),literal);
+
+    if(!success)
+    {
+        printf("invalid immediate: %s\n",instr.c_str());
+        exit(1);
+    }
+
+    i += literal.size();
+
+    tokens.push_back(Token(literal,token_type::imm));    
 }
 
 std::vector<Token> Assembler::parse_tokens(const std::string &instr)
@@ -260,25 +277,37 @@ std::vector<Token> Assembler::parse_tokens(const std::string &instr)
                 break;
             }
 
+            // specify sign on immediate
+            case '+':
+            case '-':
+            {
+                if(i < len)
+                {
+                    c = instr[i];
+                    if(isdigit(c))
+                    {
+                        decode_imm(instr,i,tokens);
+                    }
+
+                    else
+                    {
+                        printf("expected char '-' in line: %s\n",instr.c_str());
+                    }
+                }
+
+                else
+                {
+                    printf("unexpected char '-' at end of line: %s\n",instr.c_str());
+                }
+                break;
+            }
+
             default:
             {
                 // start of immediate
                 if(isdigit(c))
                 {
-                    std::string literal = "";
-
-                    i -= 1;
-                    const auto success = verify_immediate(instr.substr(i),literal);
-
-                    if(!success)
-                    {
-                        printf("invalid immediate: %s\n",instr.c_str());
-                        exit(1);
-                    }
-
-                    i += literal.size();
-
-                    tokens.push_back(Token(literal,token_type::imm));
+                    decode_imm(instr,i,tokens);
                 }
 
                 else if(isalpha(c))
@@ -458,23 +487,23 @@ uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::string &i
     {
         case 1: // dest = op1, everything else zero
         {
-            opcode |= register_table[tokens[1].literal] << 12;
+            opcode |= register_table[tokens[1].literal] << DST_OFFSET;
             break;
         }
 
 
         case 2: // src2 empty, dest = op1, src1 = op2
         {
-            opcode |= (register_table[tokens[1].literal] << 12) | 
-                (register_table[tokens[2].literal] << 20);
+            opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
+                (register_table[tokens[2].literal] << SRC1_OFFSET);
             break;
         }
 
         case 3: // dest = op1, src1 = op2, src2 = op3
         {
-            opcode |= (register_table[tokens[1].literal] << 12) | 
-                (register_table[tokens[2].literal] << 20) |
-                (register_table[tokens[3].literal] << 16);                        
+            opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
+                (register_table[tokens[2].literal] << SRC1_OFFSET) |
+                (register_table[tokens[3].literal] << SRC2_OFFSET);                        
             break;
         }
 
@@ -519,7 +548,7 @@ uint32_t Assembler::decode_b_instr(const Instr &instr_entry,const std::string &i
 
     else if(tokens[1].type == token_type::imm)
     {
-        v = std::stoi(tokens[1].literal);
+        v = std::stoi(tokens[1].literal,0,0);
     }
     
     else
@@ -542,6 +571,109 @@ uint32_t Assembler::decode_b_instr(const Instr &instr_entry,const std::string &i
     }
 
     opcode |= final_branch;
+
+    return opcode;
+}
+
+// look for a more mathy way to do this (brute force with a loop is slow for obvious reasons)
+// needs unit tests
+bool encode_i_type_operand(int32_t &v, uint32_t &s)
+{
+    // ok so we have a 4 bit shift and 12 bit signed imm
+    // to encode V into
+
+    const auto sign = is_set(v,(sizeof(v)*8)-1);
+
+    // what this effectively means is we need to check if the number can fit into a 12bit imm
+    // and keep shifting it down up to 15 unti it does if it cant then it is invalid
+    for(s = 0; s < 16; s++)
+    {
+        if(abs(v) <= set_bit(0,10)-1)
+        {
+            v = sign? set_bit(v,11) : deset_bit(v,11); 
+            v &= set_bit(0,12)-1;
+            return true;
+        }
+
+        // if we have a right side carry then its not possible to encode
+        if(is_set(abs(v),0))
+        {
+            return false;
+        }
+
+        v >>= 1;
+    }
+
+    return false;
+}
+
+uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
+{   
+    UNUSED(instr_entry); UNUSED(tokens); UNUSED(instr);
+    // ok we are expecting eg addi r0, 0x1
+
+    uint32_t opcode = 0;
+
+    // at some point we wanna handle having operands implicitly
+    // eg addi r0, r0, 1 = addi r0, 1
+    if(tokens.size()-1 != instr_entry.operand_count)
+    {
+        printf("imm: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
+        exit(1);
+    }    
+
+    switch(instr_entry.operand_count)
+    {
+        case 3:
+        {
+            // ok we are expecting two regs followed by a imm or symbol
+            if(tokens[1].type != token_type::reg || tokens[2].type != token_type::reg)
+            {
+                printf("imm: expected reg for first operand %s\n",instr.c_str());
+            }
+
+            int32_t v = 0;
+            uint32_t s = 0;
+
+            if(tokens[3].type == token_type::imm)
+            {
+                v = std::stoi(tokens[3].literal,0,0); 
+            }
+
+            else if(tokens[3].type == token_type::sym)
+            {
+                puts("imm symbol unhandled");
+                exit(1);
+            }
+
+            else
+            {
+                printf("imm: expected sybmol or imm for 2nd operand: %s\n",instr.c_str());
+                exit(1);
+            }
+
+            const auto success = encode_i_type_operand(v,s);
+
+            // TODO add psuedo op that will encode ones too large
+            // into several instrs
+            if(!success)
+            {
+                printf("cannot encode i type operand: %d\n",v);
+                exit(1);
+            }
+
+            opcode |= register_table[tokens[1].literal]  << DST_OFFSET // dst
+                | register_table[tokens[2].literal] << SRC1_OFFSET // src
+                | v | (s << 16); // encode imm and shift
+            break;
+        }
+
+        default:
+        {
+            printf("imm unhandled operand len %d\n",instr_entry.operand_count);
+            exit(1);
+        }
+    }
 
     return opcode;
 }
@@ -569,6 +701,12 @@ uint32_t Assembler::assemble_opcode(const std::string &instr,const std::vector<T
         case instr_type::B: // relative branch
         {
             opcode |= decode_b_instr(instr_entry,instr,tokens);
+            break;
+        }
+
+        case instr_type::I: // immediate
+        {
+            opcode |= decode_i_instr(instr_entry,instr,tokens);
             break;
         }
 

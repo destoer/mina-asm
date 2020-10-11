@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <ctype.h>
 #include <string.h>
+#include <math.h>
+#include <assert.h>
 #include <string>
 #include <utility>
 #include <iostream>
@@ -113,4 +115,15 @@ T sign_extend(T x, int b)
 	T res = 1;
 	res <<= b - 1;
 	return (x ^ res) - res;
+}
+
+inline int set_bit_count(uint32_t v)
+{
+    int bit_count = 0;
+    for(size_t i = 0; i < sizeof(v)*8; i++)
+    {
+        bit_count += is_set(v,i);
+    }
+
+    return bit_count;
 }

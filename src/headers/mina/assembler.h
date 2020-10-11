@@ -1,6 +1,10 @@
 #pragma once
 #include <headers/lib.h>
 
+static constexpr uint32_t SRC1_OFFSET = 20;
+static constexpr uint32_t SRC2_OFFSET = 16;
+static constexpr uint32_t DST_OFFSET = 12;
+
 enum class instr_type
 {
     S,
@@ -70,6 +74,7 @@ struct Token
 
 void dump_token_debug(std::vector<Token> tokens);
 bool verify_immediate(const std::string &instr, std::string &literal);
+bool encode_i_type_operand(int32_t &v, uint32_t &s);
 
 class Assembler
 {
@@ -105,8 +110,10 @@ private:
 
     void dump_symbol_table_debug();
 
+    void decode_imm(std::string instr, size_t &i,std::vector<Token> &tokens);
     uint32_t decode_s_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
     uint32_t decode_b_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
+    uint32_t decode_i_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
 
     std::string file = "";
 
@@ -136,6 +143,10 @@ private:
     // is there any way to get this to be const?
     std::unordered_map<std::string, Instr> instr_table = 
     {
+        // Arithmetic instrs (group 0000)
+        {"addi",Instr(0b0000,0b0000,3,instr_type::I)},
+
+
         // MOV (group 0b0101)
 
         // mov register - register
