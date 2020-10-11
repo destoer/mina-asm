@@ -153,29 +153,12 @@ InstrTest instr_test_table[] =
     {Opcode(instr_group::logic,0b1001,5,15,0), "or r0, r5, sp"},
     {Opcode(instr_group::logic,0b1010,5,15,0), "xor r0, r5, sp"},
     {Opcode(instr_group::logic,0b1011,5,15,0), "nand r0, r5, sp"},
-    {Opcode(instr_group::logic,0b1100,5,0,0), "popcnt r0, r5"},
+    {Opcode(instr_group::logic,0b1100,1,0,1), "popcnt r1, r1"},
     {Opcode(instr_group::logic,0b1101,5,0,0), "clo r0, r5"},
     {Opcode(instr_group::logic,0b1110,5,0,0), "plo r0, r5"},
 
 
     // cmp tests
-
-/*
-        // register - imm
-        {"cmpi/eq",Instr(instr_group::cmp,0b0000,2,instr_type::I)},
-        {"cmpi/lo",Instr(instr_group::cmp,0b0001,2,instr_type::I)},
-        {"cmpi/ls",Instr(instr_group::cmp,0b0010,2,instr_type::I)},
-        {"cmpi/lt",Instr(instr_group::cmp,0b0011,2,instr_type::I)},
-        {"cmpi/le",Instr(instr_group::cmp,0b0100,2,instr_type::I)},
-
-
-        // register - register
-        {"cmp/eq",Instr(instr_group::cmp,0b1000,2,instr_type::S)},
-        {"cmp/lo",Instr(instr_group::cmp,0b1001,2,instr_type::S)},
-        {"cmp/ls",Instr(instr_group::cmp,0b1010,2,instr_type::S)},
-        {"cmp/lt",Instr(instr_group::cmp,0b1011,2,instr_type::S)},
-        {"cmp/le",Instr(instr_group::cmp,0b1100,2,instr_type::S)},
-*/
 
     // register - immedaite
     {Opcode(instr_group::cmp,0b0000,1,0,0,5), "cmpi/eq r1, 5"},

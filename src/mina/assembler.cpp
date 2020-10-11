@@ -596,6 +596,10 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
                 exit(1);
             }
 
+            // it looks like the easiest thing to do is just to add a implicit shift table
+            // for the load and branch instrs that we will have to check against
+            // before we do an i type encode
+
             const auto success = encode_i_type_operand(v,s);
 
             // TODO add psuedo op that will encode ones too large

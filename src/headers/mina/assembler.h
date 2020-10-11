@@ -217,6 +217,24 @@ private:
         {"cmp/lt",Instr(instr_group::cmp,0b1011,2,instr_type::S)},
         {"cmp/le",Instr(instr_group::cmp,0b1100,2,instr_type::S)},
 
+
+        // register branch instrs
+
+        // register - immediate
+
+        // there is an implict shift by 2 added for these opcodes 
+        // as well as the load ones (shift by 1 aswell)
+        // what is the best way to handle this without just adding
+        // a specialised handler in the form of a fptr to the instr?
+        // the only other option is to add a table for loads and branches
+        // that contains an implicit shift ammount
+        // blank data to encode some "random" integer param which we will implicitly use for a shift
+        // in the reg branch group...
+        {"RBRA",Instr(instr_group::reg_branch,0b0000,2,instr_type::I)},
+
+
+        // register branch
+
         // MOV (group 0b0101)
 
         // mov register - register
