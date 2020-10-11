@@ -128,117 +128,6 @@ void Assembler::write_binary(const std::string &filename)
     write_file(filename,output);
 }
 
-template<typename F>
-bool verify_immediate_internal(const std::string &instr, size_t &i, F lambda)
-{
-    const auto len = instr.size();
-
-    for(; i < len; i++)
-    {
-        // token terminated
-        if(instr[i] == ',' || instr[i] == ' ')
-        {
-            break;
-        }
-
-        if(!lambda(instr[i]))
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-
-bool verify_immediate(const std::string &instr, std::string &literal)
-{
-    const auto len = instr.size();
-
-    // an empty immediate aint much use to us
-    if(!len)
-    {
-        return false;
-    }
-
-    size_t i = 0;
-
-    const auto c = instr[0];
-
-    // allow - or +
-    if(c == '-' || c == '+')
-    {
-        i = 1;
-        // no digit after the sign is of no use
-        if(len == 1)
-        {
-            return false;
-        }
-    }
-
-    bool valid = false;
-
-
-    // have prefix + one more digit at minimum
-    const auto prefix = i+2 < len?  instr.substr(i,2) : "";
-
-    // verify we have a valid hex number
-    if(prefix == "0x")
-    {
-        // skip past the prefix
-        i += 2;
-        valid = verify_immediate_internal(instr,i,[](const char c) 
-        {
-            return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
-        });
-    }
-
-    // verify its ones or zeros
-    else if(prefix == "0b")
-    {
-        // skip past the prefix
-        i += 2;                
-        valid = verify_immediate_internal(instr,i,[](const char c) 
-        {
-            return c == '0' || c == '1';
-        });
-    }
-
-    // verify we have all digits
-    else
-    {
-        valid = verify_immediate_internal(instr,i,[](const char c) 
-        {
-            return c >= '0' && c <= '9';
-        });
-    }
-    
-
-    if(valid)
-    {
-        literal = instr.substr(0,i);
-    }
-
-    return valid;    
-}
-
-void Assembler::decode_imm(std::string instr, size_t &i,std::vector<Token> &tokens)
-{
-    std::string literal = "";
-
-    i -= 1;
-    const auto success = verify_immediate(instr.substr(i),literal);
-
-    if(!success)
-    {
-        printf("invalid immediate: %s\n",instr.c_str());
-        exit(1);
-    }
-
-    i += literal.size();
-
-    tokens.push_back(Token(literal,token_type::imm));    
-}
 
 std::vector<Token> Assembler::parse_tokens(const std::string &instr)
 {
@@ -421,6 +310,13 @@ void Assembler::dump_symbol_table_debug()
 
 void Assembler::assemble_line(const std::string &instr)
 {
+    // we are at some point going to have to properly analyze the syntax of this
+    // as atm we dont really care about things like , [] (they are ignored but not required) 
+    // i.e add r0, r0, r0 and add r0 r0 r0
+    // are eqiv while we should really only allow the former
+    // and have no hope of parsing
+    // expressions like font_size = font_start - font_end
+    // so we should have a extra step to build an ast and then actually try to emit for the line
     const auto tokens = parse_tokens(instr);
 
     // nothing to do
@@ -495,6 +391,8 @@ uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::string &i
 
         // register - register encoding is not consistant across groups for
         // 2 operands...
+        // for now we will do this with a switch but it would be nicer to encode this
+        // with a lut
         case 2: 
         {
             switch(instr_entry.group)
@@ -511,6 +409,13 @@ uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::string &i
                     opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
                         (register_table[tokens[2].literal] << SRC2_OFFSET);
                     break;                                    
+                }
+
+                case instr_group::logic: // src2 empty, dest = op1, src1 = op2
+                {
+                    opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
+                        (register_table[tokens[2].literal] << SRC1_OFFSET);
+                    break;
                 }
 
                 default:
@@ -573,7 +478,7 @@ uint32_t Assembler::decode_b_instr(const Instr &instr_entry,const std::string &i
 
     else if(tokens[1].type == token_type::imm)
     {
-        v = std::stoi(tokens[1].literal,0,0);
+        v = convert_imm(tokens[1].literal);
     }
     
     else
@@ -669,7 +574,7 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
 
             if(tokens[2].type == token_type::imm)
             {
-                v = std::stoi(tokens[2].literal,0,0); 
+                v = convert_imm(tokens[2].literal); 
             }
 
             else if(tokens[2].type == token_type::sym)
@@ -712,7 +617,7 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
 
             if(tokens[3].type == token_type::imm)
             {
-                v = std::stoi(tokens[3].literal,0,0); 
+                v = convert_imm(tokens[3].literal); 
             }
 
             else if(tokens[3].type == token_type::sym)

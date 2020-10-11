@@ -13,9 +13,8 @@ struct ImmediateTest
     bool success;
 };
 
-static constexpr uint32_t IMMEDIATE_TEST_SIZE = 14;
 
-ImmediateTest immediate_test_table[IMMEDIATE_TEST_SIZE] = 
+ImmediateTest immediate_test_table[] = 
 {
     {"55","55",true},
     {"-55","-55",true},
@@ -32,6 +31,8 @@ ImmediateTest immediate_test_table[IMMEDIATE_TEST_SIZE] =
     {"0b","",false},
     {"-","",false}
 };
+
+static constexpr uint32_t IMMEDIATE_TEST_SIZE = sizeof(immediate_test_table) / sizeof(immediate_test_table[0]);
 
 void imm_operand_test()
 {

@@ -90,6 +90,7 @@ struct Token
 void dump_token_debug(std::vector<Token> tokens);
 bool verify_immediate(const std::string &instr, std::string &literal);
 bool encode_i_type_operand(int32_t &v, uint32_t &s);
+int32_t convert_imm(const std::string &imm);
 
 class Assembler
 {
@@ -179,6 +180,24 @@ private:
         {"sltu",Instr(instr_group::arith,0b1101,3,instr_type::S)},
         {"pcadd",Instr(instr_group::arith,0b1111,2,instr_type::S)},
 
+
+        // Logical instrucitons 
+        // group 0b0001
+        
+        // register - immediate
+        {"andi",Instr(instr_group::logic,0b0000,3,instr_type::I)},
+        {"ori",Instr(instr_group::logic,0b0001,3,instr_type::I)},
+        {"xori",Instr(instr_group::logic,0b0010,3,instr_type::I)},
+        {"nandi",Instr(instr_group::logic,0b0011,3,instr_type::I)},
+
+        // register - register
+        {"and",Instr(instr_group::logic,0b1000,3,instr_type::S)},
+        {"or",Instr(instr_group::logic,0b1001,3,instr_type::S)},
+        {"xor",Instr(instr_group::logic,0b1010,3,instr_type::S)},
+        {"nand",Instr(instr_group::logic,0b1011,3,instr_type::S)},
+        {"popcnt",Instr(instr_group::logic,0b1100,2,instr_type::S)},
+        {"clo",Instr(instr_group::logic,0b1101,2,instr_type::S)},
+        {"plo",Instr(instr_group::logic,0b1110,2,instr_type::S)},
 
         // MOV (group 0b0101)
 

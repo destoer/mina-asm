@@ -110,13 +110,14 @@ struct InstrTest
 
 void instr_test();
 
-static constexpr uint32_t INSTR_TEST_SIZE = 22;
-InstrTest instr_test_table[INSTR_TEST_SIZE] = 
+
+InstrTest instr_test_table[] = 
 {
     // arithmetic tests
 
     // register - imm
     {Opcode(instr_group::arith,0b0000,12,0,13,5),"addi r13, r12, 5"},
+    {Opcode(instr_group::arith,0b0000,12,0,13,0b11),"addi r13, r12, 0b11"},
     {Opcode(instr_group::arith,0b0000,12,0,13,-5),"addi r13, r12, -5"},
     {Opcode(instr_group::arith,0b0000,12,2,13,0xff0 >> 2),"addi r13, r12, 0xff0"},
     {Opcode(instr_group::arith,0b0000,12,2,13,-0xff0 >> 2),"addi r13, r12, -0xff0"},
@@ -137,6 +138,25 @@ InstrTest instr_test_table[INSTR_TEST_SIZE] =
     {Opcode(instr_group::arith,0b1101,12,5,13),"sltu r13, r12, r5"},
     {Opcode(instr_group::arith,0b1111,0,5,13),"pcadd r13, r5"},
 
+
+    // logical tests
+
+    // register - immediate
+
+    {Opcode(instr_group::logic,0b0000,12,0,13,5),"andi r13, r12, 5"},
+    {Opcode(instr_group::logic,0b0001,12,0,13,5),"ori r13, r12, 5"},
+    {Opcode(instr_group::logic,0b0010,12,0,13,5),"xori r13, r12, 5"},
+    {Opcode(instr_group::logic,0b0011,12,0,13,5),"nandi r13, r12, 5"},
+
+    // register - register
+    {Opcode(instr_group::logic,0b1000,5,15,0), "and r0, r5, sp"},
+    {Opcode(instr_group::logic,0b1001,5,15,0), "or r0, r5, sp"},
+    {Opcode(instr_group::logic,0b1010,5,15,0), "xor r0, r5, sp"},
+    {Opcode(instr_group::logic,0b1011,5,15,0), "nand r0, r5, sp"},
+    {Opcode(instr_group::logic,0b1100,5,0,0), "popcnt r0, r5"},
+    {Opcode(instr_group::logic,0b1101,5,0,0), "clo r0, r5"},
+    {Opcode(instr_group::logic,0b1110,5,0,0), "plo r0, r5"},
+
     // mov tests
 
     // register - register
@@ -148,6 +168,8 @@ InstrTest instr_test_table[INSTR_TEST_SIZE] =
     {Opcode(instr_group::rel_branch,0b0000,0x8000 >> 2),"bra 0x8000"},
     {Opcode(instr_group::rel_branch,0b0000,-0x8000 >> 2),"bra -0x8000"}
 };
+
+static constexpr uint32_t INSTR_TEST_SIZE = sizeof(instr_test_table) / sizeof(instr_test_table[0]);
 
 void instr_test()
 {
