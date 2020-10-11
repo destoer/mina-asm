@@ -5,6 +5,21 @@ static constexpr uint32_t SRC1_OFFSET = 20;
 static constexpr uint32_t SRC2_OFFSET = 16;
 static constexpr uint32_t DST_OFFSET = 12;
 
+
+enum class instr_group
+{
+arith = 0b0000,
+logic = 0b0001,
+cmp = 0b0010,
+reg_branch = 0b0011,
+mem = 0b0100,
+mov = 0b0101,
+shift = 0b0110,
+cnt = 0b0111,
+rel_branch = 0b1000,
+
+};
+
 enum class instr_type
 {
     S,
@@ -21,7 +36,7 @@ enum class instr_type
 struct Instr
 {
     Instr() {}
-    Instr(int g, int o,int c, instr_type t) : 
+    Instr(instr_group g, uint32_t o,uint32_t c, instr_type t) : 
         type(t), group(g), opcode(o), operand_count(c)
     {
 
@@ -29,7 +44,7 @@ struct Instr
 
     instr_type type;
 
-    uint32_t group;
+    instr_group group;
     uint32_t opcode;
     uint32_t operand_count;
     
@@ -144,30 +159,48 @@ private:
     std::unordered_map<std::string, Instr> instr_table = 
     {
         // Arithmetic instrs (group 0000)
-        {"addi",Instr(0b0000,0b0000,3,instr_type::I)},
+
+        // register - immediate
+        {"addi",Instr(instr_group::arith,0b0000,3,instr_type::I)},
+        {"multi",Instr(instr_group::arith,0b0001,3,instr_type::I)},
+        {"divi",Instr(instr_group::arith,0b0010,3,instr_type::I)},
+        {"remi",Instr(instr_group::arith,0b0011,3,instr_type::I)},
+        {"slti",Instr(instr_group::arith,0b0100,3,instr_type::I)},
+        {"sltiu",Instr(instr_group::arith,0b0101,3,instr_type::I)},
+        {"nop",Instr(instr_group::arith,0b0110,0,instr_type::I)},
+        {"pcaddi",Instr(instr_group::arith,0b0111,2,instr_type::I)},
+
+        // register - register
+        {"add",Instr(instr_group::arith,0b1000,3,instr_type::S)},
+        {"mult",Instr(instr_group::arith,0b1001,3,instr_type::S)},
+        {"div",Instr(instr_group::arith,0b1010,3,instr_type::S)},
+        {"rem",Instr(instr_group::arith,0b1011,3,instr_type::S)},
+        {"slt",Instr(instr_group::arith,0b1100,3,instr_type::S)},
+        {"sltu",Instr(instr_group::arith,0b1101,3,instr_type::S)},
+        {"pcadd",Instr(instr_group::arith,0b1111,2,instr_type::S)},
 
 
         // MOV (group 0b0101)
 
         // mov register - register
-        {"mov",Instr(0b0101,0b1000,2,instr_type::S)},
-        {"mt",Instr(0b0101,0b1001,2,instr_type::S)},
-        {"mf",Instr(0b0101,0b1010,2,instr_type::S)},
-        {"mtoc",Instr(0b0101,0b1011,1,instr_type::S)},
-        {"mfrc",Instr(0b0101,0b1100,1,instr_type::S)},
-        {"mtou",Instr(0b0101,0b1101,2,instr_type::S)},
-        {"mfou",Instr(0b0101,0b1110,2,instr_type::S)},
+        {"mov",Instr(instr_group::mov,0b1000,2,instr_type::S)},
+        {"mt",Instr(instr_group::mov,0b1001,2,instr_type::S)},
+        {"mf",Instr(instr_group::mov,0b1010,2,instr_type::S)},
+        {"mtoc",Instr(instr_group::mov,0b1011,1,instr_type::S)},
+        {"mfrc",Instr(instr_group::mov,0b1100,1,instr_type::S)},
+        {"mtou",Instr(instr_group::mov,0b1101,2,instr_type::S)},
+        {"mfou",Instr(instr_group::mov,0b1110,2,instr_type::S)},
 
         // SHIFT (group 0b0110)
 
         // shift register - register
-        {"rlsl",Instr(0b0110,0b1000,3,instr_type::S)},
-        {"rlsr",Instr(0b0110,0b1001,3,instr_type::S)},
-        {"rasr",Instr(0b0110,0b1010,3,instr_type::S)},
-        {"rror",Instr(0b0110,0b1011,3,instr_type::S)},
+        {"rlsl",Instr(instr_group::shift,0b1000,3,instr_type::S)},
+        {"rlsr",Instr(instr_group::shift,0b1001,3,instr_type::S)},
+        {"rasr",Instr(instr_group::shift,0b1010,3,instr_type::S)},
+        {"rror",Instr(instr_group::shift,0b1011,3,instr_type::S)},
 
         // branch pc reliatve (group 1000)
-        {"bra",Instr(0b1000,0b0000,1,instr_type::B)}
+        {"bra",Instr(instr_group::rel_branch,0b0000,1,instr_type::B)}
     };
 
 

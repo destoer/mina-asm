@@ -483,19 +483,44 @@ uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::string &i
     }
 
 
+
     switch(instr_entry.operand_count)
     {
+        // dont know 1 operand is consistant
         case 1: // dest = op1, everything else zero
         {
             opcode |= register_table[tokens[1].literal] << DST_OFFSET;
             break;
         }
 
-
-        case 2: // src2 empty, dest = op1, src1 = op2
+        // register - register encoding is not consistant across groups for
+        // 2 operands...
+        case 2: 
         {
-            opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
-                (register_table[tokens[2].literal] << SRC1_OFFSET);
+            switch(instr_entry.group)
+            {
+                case instr_group::mov: // src2 empty, dest = op1, src1 = op2
+                {
+                    opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
+                        (register_table[tokens[2].literal] << SRC1_OFFSET);
+                    break;                    
+                }
+
+                case instr_group::arith: // src2 op2, dest = op1, src1 = empty
+                {
+                    opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
+                        (register_table[tokens[2].literal] << SRC2_OFFSET);
+                    break;                                    
+                }
+
+                default:
+                {
+                    printf("s type 2 operand group unhandled: %d\n",static_cast<int>(instr_entry.group));
+                    exit(1);
+                }
+            }
+
+
             break;
         }
 
@@ -624,12 +649,62 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
 
     switch(instr_entry.operand_count)
     {
+        case 0: // eg nop
+        {
+            // no params so we have nothing to do
+            break;
+        }
+
+
+        case 2:
+        {
+            // ok we are expecting one reg followed by a imm or symbol
+            if(tokens[1].type != token_type::reg)
+            {
+                printf("imm: expected reg for first operand %s\n",instr.c_str());
+            }
+
+            int32_t v = 0;
+            uint32_t s = 0;
+
+            if(tokens[2].type == token_type::imm)
+            {
+                v = std::stoi(tokens[2].literal,0,0); 
+            }
+
+            else if(tokens[2].type == token_type::sym)
+            {
+                puts("imm symbol unhandled");
+                exit(1);
+            }
+
+            else
+            {
+                printf("imm: expected sybmol or imm for 2nd operand: %s\n",instr.c_str());
+                exit(1);
+            }
+
+            const auto success = encode_i_type_operand(v,s);
+
+            // TODO add psuedo op that will encode ones too large
+            // into several instrs
+            if(!success)
+            {
+                printf("cannot encode i type operand: %d\n",v);
+                exit(1);
+            }
+
+            opcode |= register_table[tokens[1].literal]  << DST_OFFSET // dst
+                | v | (s << 16); // encode imm and shift
+            break;
+        }
+
         case 3:
         {
             // ok we are expecting two regs followed by a imm or symbol
             if(tokens[1].type != token_type::reg || tokens[2].type != token_type::reg)
             {
-                printf("imm: expected reg for first operand %s\n",instr.c_str());
+                printf("imm: expected reg for first and 2nd operand %s\n",instr.c_str());
             }
 
             int32_t v = 0;
@@ -648,7 +723,7 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
 
             else
             {
-                printf("imm: expected sybmol or imm for 2nd operand: %s\n",instr.c_str());
+                printf("imm: expected sybmol or imm for 3rd operand: %s\n",instr.c_str());
                 exit(1);
             }
 
@@ -686,7 +761,7 @@ uint32_t Assembler::assemble_opcode(const std::string &instr,const std::vector<T
     const auto instr_entry = instr_table[tokens[0].literal];
 
     // every opcode has the group and opcode field
-    uint32_t opcode = (instr_entry.group << 28) | (instr_entry.opcode << 24);
+    uint32_t opcode = (static_cast<uint32_t>(instr_entry.group) << 28) | (instr_entry.opcode << 24);
 
     switch(instr_entry.type)
     {

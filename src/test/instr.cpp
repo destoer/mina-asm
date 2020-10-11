@@ -15,9 +15,9 @@ struct Opcode
         this->op5 = op.op5;        
     }
 
-    Opcode(int32_t group, int32_t opcode, int32_t op1=0, int32_t op2=0, int32_t op3=0, int32_t op4=0, int32_t op5=0)
+    Opcode(instr_group group, int32_t opcode, int32_t op1=0, int32_t op2=0, int32_t op3=0, int32_t op4=0, int32_t op5=0)
     {
-        this->group = group;
+        this->group = static_cast<uint32_t>(group);
         this->opcode = opcode;
         this->op1 = op1;
         this->op2 = op2;
@@ -89,7 +89,7 @@ struct Opcode
     }
 
     int32_t opcode = 0;
-    int32_t group = 0;
+    uint32_t group = 0;
     int32_t op1 = 0; // src1 / sbz
     int32_t op2 = 0; // src2 / shift / imm
     int32_t op3 = 0; // dest
@@ -110,23 +110,43 @@ struct InstrTest
 
 void instr_test();
 
-static constexpr uint32_t INSTR_TEST_SIZE = 9;
+static constexpr uint32_t INSTR_TEST_SIZE = 22;
 InstrTest instr_test_table[INSTR_TEST_SIZE] = 
 {
     // arithmetic tests
-    {Opcode(0b0000,0b0000,12,0,13,5),"addi r13, r12, 5"},
-    {Opcode(0b0000,0b0000,12,0,13,-5),"addi r13, r12, -5"},
-    {Opcode(0b0000,0b0000,12,2,13,0xff0 >> 2),"addi r13, r12, 0xff0"},
-    {Opcode(0b0000,0b0000,12,2,13,-0xff0 >> 2),"addi r13, r12, -0xff0"},
+
+    // register - imm
+    {Opcode(instr_group::arith,0b0000,12,0,13,5),"addi r13, r12, 5"},
+    {Opcode(instr_group::arith,0b0000,12,0,13,-5),"addi r13, r12, -5"},
+    {Opcode(instr_group::arith,0b0000,12,2,13,0xff0 >> 2),"addi r13, r12, 0xff0"},
+    {Opcode(instr_group::arith,0b0000,12,2,13,-0xff0 >> 2),"addi r13, r12, -0xff0"},
+    {Opcode(instr_group::arith,0b0001,12,0,13,5),"multi r13, r12, 5"},
+    {Opcode(instr_group::arith,0b0010,12,0,13,5),"divi r13, r12, 5"},
+    {Opcode(instr_group::arith,0b0011,12,0,13,5),"remi r13, r12, 5"},
+    {Opcode(instr_group::arith,0b0100,12,0,13,5),"slti r13, r12, 5"},
+    {Opcode(instr_group::arith,0b0101,12,0,13,5),"sltiu r13, r12, 5"},
+    {Opcode(instr_group::arith,0b0110,0,0,0,0),"nop"},
+    {Opcode(instr_group::arith,0b0111,0,0,13,5),"pcaddi r13, 5"},
+
+
+    // register - register
+    {Opcode(instr_group::arith,0b1001,12,5,13),"mult r13, r12, r5"},
+    {Opcode(instr_group::arith,0b1010,12,5,13),"div r13, r12, r5"},
+    {Opcode(instr_group::arith,0b1011,12,5,13),"rem r13, r12, r5"},
+    {Opcode(instr_group::arith,0b1100,12,5,13),"slt r13, r12, r5"},
+    {Opcode(instr_group::arith,0b1101,12,5,13),"sltu r13, r12, r5"},
+    {Opcode(instr_group::arith,0b1111,0,5,13),"pcadd r13, r5"},
 
     // mov tests
-    {Opcode(0b0101,0b1000,5,0,0), "mov r0, r5"},
-    {Opcode(0b0101,0b1001,2,0,4), "mt r4, r2"},
-    {Opcode(0b0101,0b1100,0,0,15), "mfrc sp"},
+
+    // register - register
+    {Opcode(instr_group::mov,0b1000,5,0,0), "mov r0, r5"},
+    {Opcode(instr_group::mov,0b1001,2,0,4), "mt r4, r2"},
+    {Opcode(instr_group::mov,0b1100,0,0,15), "mfrc sp"},
 
     // branch rel tests
-    {Opcode(0b1000,0b0000,0x8000 >> 2),"bra 0x8000"},
-    {Opcode(0b1000,0b0000,-0x8000 >> 2),"bra -0x8000"}
+    {Opcode(instr_group::rel_branch,0b0000,0x8000 >> 2),"bra 0x8000"},
+    {Opcode(instr_group::rel_branch,0b0000,-0x8000 >> 2),"bra -0x8000"}
 };
 
 void instr_test()
