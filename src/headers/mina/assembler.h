@@ -199,6 +199,24 @@ private:
         {"clo",Instr(instr_group::logic,0b1101,2,instr_type::S)},
         {"plo",Instr(instr_group::logic,0b1110,2,instr_type::S)},
 
+
+        // cmp (group 0b0010)
+
+        // register - imm
+        {"cmpi/eq",Instr(instr_group::cmp,0b0000,2,instr_type::I)},
+        {"cmpi/lo",Instr(instr_group::cmp,0b0001,2,instr_type::I)},
+        {"cmpi/ls",Instr(instr_group::cmp,0b0010,2,instr_type::I)},
+        {"cmpi/lt",Instr(instr_group::cmp,0b0011,2,instr_type::I)},
+        {"cmpi/le",Instr(instr_group::cmp,0b0100,2,instr_type::I)},
+
+
+        // register - register
+        {"cmp/eq",Instr(instr_group::cmp,0b1000,2,instr_type::S)},
+        {"cmp/lo",Instr(instr_group::cmp,0b1001,2,instr_type::S)},
+        {"cmp/ls",Instr(instr_group::cmp,0b1010,2,instr_type::S)},
+        {"cmp/lt",Instr(instr_group::cmp,0b1011,2,instr_type::S)},
+        {"cmp/le",Instr(instr_group::cmp,0b1100,2,instr_type::S)},
+
         // MOV (group 0b0101)
 
         // mov register - register

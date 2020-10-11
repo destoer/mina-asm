@@ -418,6 +418,13 @@ uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::string &i
                     break;
                 }
 
+                case instr_group::cmp: // src2 op2, dest = empty, src1 = op1
+                {
+                    opcode |= (register_table[tokens[1].literal] << SRC1_OFFSET) | 
+                        (register_table[tokens[2].literal] << SRC2_OFFSET);
+                    break;
+                }
+
                 default:
                 {
                     printf("s type 2 operand group unhandled: %d\n",static_cast<int>(instr_entry.group));
@@ -599,8 +606,39 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
                 exit(1);
             }
 
-            opcode |= register_table[tokens[1].literal]  << DST_OFFSET // dst
-                | v | (s << 16); // encode imm and shift
+            // we should again probably use a lut for where to put the operands 
+            // but use a switch for now
+            switch(instr_entry.group)
+            {
+
+                case instr_group::arith:
+                {
+                    opcode |= register_table[tokens[1].literal]  << DST_OFFSET
+                        | v | (s << 16); // encode imm and shift
+                    break;
+                }
+
+                case instr_group::logic:
+                {
+                    opcode |= register_table[tokens[1].literal]  << DST_OFFSET 
+                        | v | (s << 16); // encode imm and shift
+                    break;
+                }
+
+                case instr_group::cmp:
+                {
+                    opcode |= register_table[tokens[1].literal]  << SRC1_OFFSET 
+                        | v | (s << 16); // encode imm and shift
+                    break;
+                }
+
+                default:
+                {
+                    printf("i type 2 operand group unhandled: %d\n",static_cast<int>(instr_entry.group));
+                    exit(1);
+                }
+
+            }
             break;
         }
 
