@@ -265,6 +265,25 @@ InstrTest instr_test_table[] =
     {Opcode(instr_group::shift,0b1100,3,4,8,5),"flsl r8,r3,r4,5"},
     {Opcode(instr_group::shift,0b1101,3,4,8,5),"flsr r8,r3,r4,5"},
 
+
+    // control instructions
+
+    // register - immedaite
+    {Opcode(instr_group::cnt,0b0000,0,0,0,0),"stop"},
+    {Opcode(instr_group::cnt,0b0001,0,0,0,0),"wfi"},
+    {Opcode(instr_group::cnt,0b0010,0,0,0,0),"sett"},
+    {Opcode(instr_group::cnt,0b0011,0,0,0,0),"clrt"},
+    {Opcode(instr_group::cnt,0b0100,0,0,0,0),"switch"},
+
+
+    // register - register
+    {Opcode(instr_group::cnt,0b1000,0,0,1,0),"svcall r1"},
+    {Opcode(instr_group::cnt,0b1001,2,0,1,0),"fault r1, r2"},
+    {Opcode(instr_group::cnt,0b1010,0,0,1,0),"mtof r1"},
+    {Opcode(instr_group::cnt,0b1011,0,0,1,0),"mfrf r1"},
+
+
+
     // branch rel tests
     {Opcode(instr_group::rel_branch,0b0000,0x8000 >> 2),"bra 0x8000"},
     {Opcode(instr_group::rel_branch,0b0000,-0x8000 >> 2),"bra -0x8000"}

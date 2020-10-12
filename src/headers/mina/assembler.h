@@ -245,7 +245,7 @@ private:
         {"rocall",Instr(instr_group::reg_branch,0b1001,2,instr_type::S)},
 
 
-        // memory instrs
+        // memory group
 
         // register - immediate
         {"ld",Instr(instr_group::mem,0b0000,3,instr_type::I)},
@@ -304,6 +304,22 @@ private:
         // special
         {"flsl",Instr(instr_group::shift,0b1100,4,instr_type::F)},
         {"flsr",Instr(instr_group::shift,0b1101,4,instr_type::F)},        
+
+        // control group
+
+        // register - immedaite
+
+        {"stop",Instr(instr_group::cnt,0b0000,0,instr_type::I)},
+        {"wfi",Instr(instr_group::cnt,0b0001,0,instr_type::I)},
+        {"sett",Instr(instr_group::cnt,0b0010,0,instr_type::I)},
+        {"clrt",Instr(instr_group::cnt,0b0011,0,instr_type::I)},
+        {"switch",Instr(instr_group::cnt,0b0100,0,instr_type::I)},
+
+        // register - register
+        {"svcall",Instr(instr_group::cnt,0b1000,1,instr_type::S)},
+        {"fault",Instr(instr_group::cnt,0b1001,2,instr_type::S)},
+        {"mtof",Instr(instr_group::cnt,0b1010,1,instr_type::S)},
+        {"mfrf",Instr(instr_group::cnt,0b1011,1,instr_type::S)},
 
         // branch pc reliatve (group 1000)
         {"bra",Instr(instr_group::rel_branch,0b0000,1,instr_type::B)}

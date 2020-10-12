@@ -440,6 +440,13 @@ uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::string &i
                     break;
                 }
 
+                case instr_group::cnt:
+                {
+                    opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
+                        (register_table[tokens[2].literal] << SRC1_OFFSET);
+                    break;                               
+                }
+
                 default:
                 {
                     printf("s type 2 operand group unhandled: %d\n",static_cast<int>(instr_entry.group));
