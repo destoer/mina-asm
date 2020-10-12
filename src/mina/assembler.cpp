@@ -425,6 +425,13 @@ uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::string &i
                     break;
                 }
 
+                case instr_group::reg_branch: // src2 op2, dest = empty, src1 = op1
+                {
+                    opcode |= (register_table[tokens[1].literal] << SRC1_OFFSET) | 
+                        (register_table[tokens[2].literal] << SRC2_OFFSET);
+                    break;
+                }
+
                 default:
                 {
                     printf("s type 2 operand group unhandled: %d\n",static_cast<int>(instr_entry.group));
@@ -544,6 +551,18 @@ bool encode_i_type_operand(int32_t &v, uint32_t &s)
     return false;
 }
 
+
+uint32_t handle_i_implicit_shift(uint32_t v,uint32_t shift)
+{
+    if(v & set_bit(0,shift)-1 > 0)
+    {
+        printf("implicit shift cannot encode i type operand\n");
+        exit(1);
+    }
+
+    return v >> shift;
+}
+
 uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
 {   
     UNUSED(instr_entry); UNUSED(tokens); UNUSED(instr);
@@ -596,9 +615,12 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
                 exit(1);
             }
 
-            // it looks like the easiest thing to do is just to add a implicit shift table
-            // for the load and branch instrs that we will have to check against
-            // before we do an i type encode
+            // extra implicit shift, for reg branch
+            if(instr_entry.group == instr_group::reg_branch)
+            {
+                v = handle_i_implicit_shift(v,reg_branch_shift[instr_entry.opcode]);
+            }
+
 
             const auto success = encode_i_type_operand(v,s);
 
@@ -630,6 +652,13 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
                 }
 
                 case instr_group::cmp:
+                {
+                    opcode |= register_table[tokens[1].literal]  << SRC1_OFFSET 
+                        | v | (s << 16); // encode imm and shift
+                    break;
+                }
+
+                case instr_group::reg_branch:
                 {
                     opcode |= register_table[tokens[1].literal]  << SRC1_OFFSET 
                         | v | (s << 16); // encode imm and shift

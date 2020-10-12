@@ -156,6 +156,12 @@ private:
         {"sp", 15}
     };
 
+
+    static constexpr uint32_t reg_branch_shift[0xf] = 
+    {
+        2,2,0,0,0,0,0,0,0,0,0,0,0,0,0
+    };
+
     // is there any way to get this to be const?
     std::unordered_map<std::string, Instr> instr_table = 
     {
@@ -222,20 +228,15 @@ private:
 
         // register - immediate
 
-        // there is an implict shift by 2 added for these opcodes 
-        // as well as the load ones (shift by 1 aswell)
-        // what is the best way to handle this without just adding
-        // a specialised handler in the form of a fptr to the instr?
-        // the only other option is to add a table for loads and branches
-        // that contains an implicit shift ammount
-        // blank data to encode some "random" integer param which we will implicitly use for a shift
-        // in the reg branch group...
-        {"RBRA",Instr(instr_group::reg_branch,0b0000,2,instr_type::I)},
+        {"rbra",Instr(instr_group::reg_branch,0b0000,2,instr_type::I)},
+        {"rcall",Instr(instr_group::reg_branch,0b0001,2,instr_type::I)},
+        {"ret",Instr(instr_group::reg_branch,0b0010,0,instr_type::I)},
 
-
-        // register branch
+        // register - register
 
         // MOV (group 0b0101)
+        {"robra",Instr(instr_group::reg_branch,0b1000,2,instr_type::S)},
+        {"rocall",Instr(instr_group::reg_branch,0b1001,2,instr_type::S)},
 
         // mov register - register
         {"mov",Instr(instr_group::mov,0b1000,2,instr_type::S)},

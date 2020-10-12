@@ -174,6 +174,20 @@ InstrTest instr_test_table[] =
     {Opcode(instr_group::cmp,0b1011,1,5,0), "cmp/lt r1, r5"},
     {Opcode(instr_group::cmp,0b1100,1,5,0), "cmp/le r1, r5"},
 
+    // register branch tests
+
+    // register - immediate
+
+    // implicit shift of 2
+    {Opcode(instr_group::reg_branch,0b0000,4,0,0,0x20 >> 2),"rbra r4, 0x20"},
+    {Opcode(instr_group::reg_branch,0b0001,4,0,0,0x20 >> 2),"rcall r4, 0x20"},
+    {Opcode(instr_group::reg_branch,0b0010,0,0,0,0),"ret"},
+
+    // register - register
+    {Opcode(instr_group::reg_branch,0b1000,1,5,0), "robra r1, r5"},
+    {Opcode(instr_group::reg_branch,0b1001,1,5,0), "rocall r1, r5"},
+
+
     // mov tests
 
     // register - register
