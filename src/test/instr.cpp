@@ -75,8 +75,19 @@ struct Opcode
                 op2 = 0;
                 op3 = (op >> 12) & 0xf;  
                 // encode the split imm back in to one param just because its easy
-                op4 = (op & 0x0fff) | ((op >> SRC2_OFFSET) & 0xf) << 12;               
+                op4 = (op & 0x0fff) | ((op >> SRC2_OFFSET) & 0xf) << 12;
+                op5 = 0;               
                 break;
+            }
+
+            case instr_type::F:
+            {
+                op1 = (op >> 20) & 0xf;
+                op2 = (op >> 16) & 0xf;
+                op3 = (op >> 12) & 0xf;
+                op4 = (op >> 8) & 0xf;
+                op5 = 0;
+                break;              
             }
 
             default:
@@ -235,6 +246,24 @@ InstrTest instr_test_table[] =
     {Opcode(instr_group::mov,0b1000,5,0,0), "mov r0, r5"},
     {Opcode(instr_group::mov,0b1001,2,0,4), "mt r4, r2"},
     {Opcode(instr_group::mov,0b1100,0,0,15), "mfrc sp"},
+
+    // shift tests
+    
+    // register - immedaite
+    {Opcode(instr_group::shift,0b0000,3,4,8,0),"lsl r8, r3, 4"},
+    {Opcode(instr_group::shift,0b0001,3,4,8,0),"lsr r8, r3, 4"},
+    {Opcode(instr_group::shift,0b0010,3,4,8,0),"asr r8, r3, 4"},
+    {Opcode(instr_group::shift,0b0011,3,4,8,0),"ror r8, r3, 4"},
+
+    // register - register
+    {Opcode(instr_group::shift,0b1000,3,4,8),"rlsl r8, r3, r4"},
+    {Opcode(instr_group::shift,0b1001,3,4,8),"rlsr r8, r3, r4"},
+    {Opcode(instr_group::shift,0b1010,3,4,8),"rasr r8, r3, r4"},
+    {Opcode(instr_group::shift,0b1011,3,4,8),"rror r8, r3, r4"},
+
+    // special
+    {Opcode(instr_group::shift,0b1100,3,4,8,5),"flsl r8,r3,r4,5"},
+    {Opcode(instr_group::shift,0b1101,3,4,8,5),"flsr r8,r3,r4,5"},
 
     // branch rel tests
     {Opcode(instr_group::rel_branch,0b0000,0x8000 >> 2),"bra 0x8000"},

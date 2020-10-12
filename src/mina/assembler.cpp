@@ -378,15 +378,14 @@ uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::string &i
     }
 
     // verfiy all operands are registers
-    for(size_t i = 1; i < instr_entry.operand_count; i++)
+    for(size_t i = 1; i < tokens.size(); i++)
     {
         if(tokens[i].type != token_type::reg)
         {
-            printf("[S-type-instr] expected register operand");
+            printf("[S-type-instr] expected register operand\n");
             exit(1);
         }
     }
-
 
 
     switch(instr_entry.operand_count)
@@ -563,7 +562,7 @@ bool encode_i_type_operand(int32_t &v, uint32_t &s)
 
 uint32_t handle_i_implicit_shift(uint32_t v,uint32_t shift)
 {
-    if(v & set_bit(0,shift)-1 > 0)
+    if( (v & (set_bit(0,shift)-1)) > 0)
     {
         printf("implicit shift cannot encode i type operand\n");
         exit(1);
@@ -635,6 +634,8 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
             }
 
 
+
+
             const auto success = encode_i_type_operand(v,s);
 
             // TODO add psuedo op that will encode ones too large
@@ -644,6 +645,8 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
                 printf("cannot encode i type operand: %d\n",v);
                 exit(1);
             }
+        
+
 
             // we should again probably use a lut for where to put the operands 
             // but use a switch for now
@@ -735,14 +738,29 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
                 v = handle_i_implicit_shift(v,mem_shift[instr_entry.opcode]);
             }
 
-            const auto success = encode_i_type_operand(v,s);
-
-            // TODO add psuedo op that will encode ones too large
-            // into several instrs
-            if(!success)
+            if(instr_entry.group != instr_group::shift)
             {
-                printf("cannot encode i type operand: %d\n",v);
-                exit(1);
+                const auto success = encode_i_type_operand(v,s);
+                // TODO add psuedo op that will encode ones too large
+                // into several instrs
+                if(!success)
+                {
+                    printf("cannot encode i type operand: %d\n",v);
+                    exit(1);
+                }
+
+            }
+
+            // for shifts we only want the shift field and to ignore the imm
+            else
+            {
+                s = v;
+                v = 0;
+
+                if(s > 0xf)
+                {
+                    printf("shift imm: out of range shift: %d\n",s);
+                }
             }
 
             opcode |= register_table[tokens[1].literal]  << DST_OFFSET // dst
@@ -766,11 +784,10 @@ uint32_t Assembler::decode_m_instr(const Instr &instr_entry,const std::string &i
 {
     uint32_t opcode = 0;
 
-    // at some point we wanna handle having operands implicitly
-    // eg addi r0, r0, 1 = addi r0, 1
+
     if(tokens.size()-1 != instr_entry.operand_count)
     {
-        printf("imm: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
+        printf("m: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
         exit(1);
     }    
 
@@ -782,11 +799,10 @@ uint32_t Assembler::decode_m_instr(const Instr &instr_entry,const std::string &i
             // ok we are expecting one reg followed by a imm or symbol
             if(tokens[1].type != token_type::reg)
             {
-                printf("imm: expected reg for first operand %s\n",instr.c_str());
+                printf("m: expected reg for first operand %s\n",instr.c_str());
             }
 
             uint32_t v = 0;
-            uint32_t s = 0;
 
             if(tokens[2].type == token_type::imm)
             {
@@ -829,6 +845,70 @@ uint32_t Assembler::decode_m_instr(const Instr &instr_entry,const std::string &i
     return opcode;
 }
 
+// currently only used for shifts
+uint32_t Assembler::decode_f_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
+{
+    uint32_t opcode = 0;
+
+    if(tokens.size()-1 != instr_entry.operand_count)
+    {
+        printf("f: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
+        exit(1);
+    }    
+
+    switch(instr_entry.operand_count)
+    {
+
+        case 4:
+        {
+            // ok we are expecting two regs followed by a imm or symbol
+            if(tokens[1].type != token_type::reg || tokens[2].type != token_type::reg || tokens[3].type != token_type::reg)
+            {
+                printf("f: expected reg for 1st,2nd and 3rd operand %s\n",instr.c_str());
+            }
+
+            int32_t v = 0;
+
+            if(tokens[4].type == token_type::imm)
+            {
+                v = convert_imm(tokens[4].literal); 
+            }
+
+            else if(tokens[4].type == token_type::sym)
+            {
+                puts("f symbol unhandled");
+                exit(1);
+            }
+
+            else
+            {
+                printf("f: expected sybmol or imm for 3rd operand: %s\n",instr.c_str());
+                exit(1);
+            }
+
+        
+            // dest = op1, src1 = op2, src2 = op3
+            opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
+                (register_table[tokens[2].literal] << SRC1_OFFSET) |
+                (register_table[tokens[3].literal] << SRC2_OFFSET) |
+                v << 8; // rshift 8 bits in                       
+        
+            break;
+        }
+
+        default:
+        {
+            printf("m unhandled operand len %d\n",instr_entry.operand_count);
+            exit(1);            
+            break;
+        }
+    }
+
+
+
+    return opcode;
+}
+
 uint32_t Assembler::assemble_opcode(const std::string &instr,const std::vector<Token> &tokens)
 {
     
@@ -865,6 +945,12 @@ uint32_t Assembler::assemble_opcode(const std::string &instr,const std::vector<T
         case instr_type::M: // 16 bit imm
         {
             opcode |= decode_m_instr(instr_entry,instr,tokens);
+            break;
+        }
+
+        case instr_type::F: // funnel shift
+        {
+            opcode |= decode_f_instr(instr_entry,instr,tokens);
             break;
         }
 

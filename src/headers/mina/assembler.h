@@ -131,6 +131,7 @@ private:
     uint32_t decode_b_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
     uint32_t decode_i_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
     uint32_t decode_m_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
+    uint32_t decode_f_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
 
     std::string file = "";
 
@@ -288,11 +289,21 @@ private:
 
         // SHIFT (group 0b0110)
 
+        // register - immediate
+        {"lsl",Instr(instr_group::shift,0b0000,3,instr_type::I)},
+        {"lsr",Instr(instr_group::shift,0b0001,3,instr_type::I)},
+        {"asr",Instr(instr_group::shift,0b0010,3,instr_type::I)},
+        {"ror",Instr(instr_group::shift,0b0011,3,instr_type::I)},        
+
         // shift register - register
         {"rlsl",Instr(instr_group::shift,0b1000,3,instr_type::S)},
         {"rlsr",Instr(instr_group::shift,0b1001,3,instr_type::S)},
         {"rasr",Instr(instr_group::shift,0b1010,3,instr_type::S)},
         {"rror",Instr(instr_group::shift,0b1011,3,instr_type::S)},
+
+        // special
+        {"flsl",Instr(instr_group::shift,0b1100,4,instr_type::F)},
+        {"flsr",Instr(instr_group::shift,0b1101,4,instr_type::F)},        
 
         // branch pc reliatve (group 1000)
         {"bra",Instr(instr_group::rel_branch,0b0000,1,instr_type::B)}
