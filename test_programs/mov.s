@@ -1,4 +1,17 @@
 
+; register - immediate
+movi r5, 5
+mt r5, 5
+mf r5, 5
+
+; register - special
+
+; r5 = 0xffffffff
+; we should encode a full 32 bit load
+; as a pseudo instr using this
+movl r5, 0xffff
+movu r5, 0xffff
+
 ; test register - register
 mov r0, r5
 mt r2, r3

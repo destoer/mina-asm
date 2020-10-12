@@ -8,7 +8,7 @@ bool verify_immediate_internal(const std::string &instr, size_t &i, F lambda)
     for(; i < len; i++)
     {
         // token terminated
-        if(instr[i] == ',' || instr[i] == ' ')
+        if(instr[i] == ',' || instr[i] == ' ' || instr[i] == ']')
         {
             break;
         }

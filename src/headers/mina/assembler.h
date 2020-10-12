@@ -130,6 +130,7 @@ private:
     uint32_t decode_s_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
     uint32_t decode_b_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
     uint32_t decode_i_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
+    uint32_t decode_m_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
 
     std::string file = "";
 
@@ -157,9 +158,14 @@ private:
     };
 
 
-    static constexpr uint32_t reg_branch_shift[0xf] = 
+    static constexpr uint32_t reg_branch_shift[0x10] = 
     {
-        2,2,0,0,0,0,0,0,0,0,0,0,0,0,0
+        2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    };
+
+    static constexpr uint32_t mem_shift[0x10] =
+    {
+        2,1,0,2,1,0,2,2,0,0,0,0,0,0,0,0
     };
 
     // is there any way to get this to be const?
@@ -234,9 +240,42 @@ private:
 
         // register - register
 
-        // MOV (group 0b0101)
         {"robra",Instr(instr_group::reg_branch,0b1000,2,instr_type::S)},
         {"rocall",Instr(instr_group::reg_branch,0b1001,2,instr_type::S)},
+
+
+        // memory instrs
+
+        // register - immediate
+        {"ld",Instr(instr_group::mem,0b0000,3,instr_type::I)},
+        {"ldh",Instr(instr_group::mem,0b0001,3,instr_type::I)},
+        {"ldb",Instr(instr_group::mem,0b0010,3,instr_type::I)},
+        {"st",Instr(instr_group::mem,0b0011,3,instr_type::I)},
+        {"sth",Instr(instr_group::mem,0b0100,3,instr_type::I)},
+        {"stb",Instr(instr_group::mem,0b0101,3,instr_type::I)},
+        {"ldc",Instr(instr_group::mem,0b0110,2,instr_type::I)},
+        {"stc",Instr(instr_group::mem,0b0111,2,instr_type::I)},
+
+        // register - register
+        {"rld",Instr(instr_group::mem,0b1000,3,instr_type::S)},
+        {"rldh",Instr(instr_group::mem,0b1001,3,instr_type::S)},
+        {"rldb",Instr(instr_group::mem,0b1010,3,instr_type::S)},
+        {"rst",Instr(instr_group::mem,0b1011,3,instr_type::S)},
+        {"rsth",Instr(instr_group::mem,0b1100,3,instr_type::S)},
+        {"rstb",Instr(instr_group::mem,0b1101,3,instr_type::S)},
+        {"pop",Instr(instr_group::mem,0b1110,1,instr_type::S)},
+        {"push",Instr(instr_group::mem,0b1111,1,instr_type::S)},        
+
+         // MOV (group 0b0101)
+
+        // mov register - immediate
+        {"movi",Instr(instr_group::mov,0b0000,2,instr_type::I)},
+        {"mti",Instr(instr_group::mov,0b0001,2,instr_type::I)},        
+        {"mfi",Instr(instr_group::mov,0b0010,2,instr_type::I)},
+
+        // mov register - special
+        {"movl",Instr(instr_group::mov,0b0011,2,instr_type::M)},
+        {"movu",Instr(instr_group::mov,0b0100,2,instr_type::M)},
 
         // mov register - register
         {"mov",Instr(instr_group::mov,0b1000,2,instr_type::S)},

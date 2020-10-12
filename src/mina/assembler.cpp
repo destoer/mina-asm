@@ -166,6 +166,15 @@ std::vector<Token> Assembler::parse_tokens(const std::string &instr)
                 break;
             }
 
+            // this along with arithmetic operators, spaces, commands
+            // will have to actually verified for syntax atm
+            // for simplicltly we are just ignoring them while we get the encoding down
+            case ']':
+            case '[':
+            {
+                break;
+            }
+
             // specify sign on immediate
             case '+':
             case '-':
@@ -203,7 +212,7 @@ std::vector<Token> Assembler::parse_tokens(const std::string &instr)
                 {
                     std::string literal(1,c);
 
-                    for(; i < len && instr[i] != ' ' && instr[i] != ','; i++)
+                    for(; i < len && instr[i] != ' ' && instr[i] != ',' && instr[i] != ']'; i++)
                     {
                         literal += instr[i];
                     }
@@ -243,7 +252,7 @@ std::vector<Token> Assembler::parse_tokens(const std::string &instr)
 
                 else // something has gone wrong
                 {
-                    printf("illegal token: %c!", c);
+                    printf("illegal token: '%c'", c);
                     exit(1);
                 }
 
@@ -564,8 +573,7 @@ uint32_t handle_i_implicit_shift(uint32_t v,uint32_t shift)
 }
 
 uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
-{   
-    UNUSED(instr_entry); UNUSED(tokens); UNUSED(instr);
+{
     // ok we are expecting eg addi r0, 0x1
 
     uint32_t opcode = 0;
@@ -615,10 +623,15 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
                 exit(1);
             }
 
-            // extra implicit shift, for reg branch
+
             if(instr_entry.group == instr_group::reg_branch)
             {
                 v = handle_i_implicit_shift(v,reg_branch_shift[instr_entry.opcode]);
+            }
+
+            else if(instr_entry.group == instr_group::mem)
+            {
+                v = handle_i_implicit_shift(v,mem_shift[instr_entry.opcode]);
             }
 
 
@@ -665,6 +678,20 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
                     break;
                 }
 
+                case instr_group::mem:
+                {
+                    opcode |= register_table[tokens[1].literal]  << SRC1_OFFSET 
+                        | v | (s << 16); // encode imm and shift                    
+                    break;
+                }
+
+                case instr_group::mov:
+                {
+                    opcode |= register_table[tokens[1].literal]  << DST_OFFSET 
+                        | v | (s << 16); // encode imm and shift
+                    break;                    
+                }
+
                 default:
                 {
                     printf("i type 2 operand group unhandled: %d\n",static_cast<int>(instr_entry.group));
@@ -703,6 +730,11 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
                 exit(1);
             }
 
+            if(instr_entry.group == instr_group::mem)
+            {
+                v = handle_i_implicit_shift(v,mem_shift[instr_entry.opcode]);
+            }
+
             const auto success = encode_i_type_operand(v,s);
 
             // TODO add psuedo op that will encode ones too large
@@ -729,6 +761,74 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
     return opcode;
 }
 
+// atm this is only used for mov in the isa spec
+uint32_t Assembler::decode_m_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
+{
+    uint32_t opcode = 0;
+
+    // at some point we wanna handle having operands implicitly
+    // eg addi r0, r0, 1 = addi r0, 1
+    if(tokens.size()-1 != instr_entry.operand_count)
+    {
+        printf("imm: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
+        exit(1);
+    }    
+
+    switch(instr_entry.operand_count)
+    {
+
+        case 2:
+        {
+            // ok we are expecting one reg followed by a imm or symbol
+            if(tokens[1].type != token_type::reg)
+            {
+                printf("imm: expected reg for first operand %s\n",instr.c_str());
+            }
+
+            uint32_t v = 0;
+            uint32_t s = 0;
+
+            if(tokens[2].type == token_type::imm)
+            {
+                v = convert_imm(tokens[2].literal); 
+            }
+
+            else if(tokens[2].type == token_type::sym)
+            {
+                puts("m symbol unhandled");
+                exit(1);
+            }
+
+            else
+            {
+                printf("m: expected sybmol or imm for 2nd operand: %s\n",instr.c_str());
+                exit(1);
+            }
+
+            // max 16 bit unsigned imm
+            if(v >= set_bit(0,16))
+            {
+                printf("cannot encode m type operand: %d\n",v);
+            }
+
+            // lower 12 bit at bottom of op
+            // upper 4 where src2 field normally is
+            opcode |= register_table[tokens[1].literal] << DST_OFFSET |
+                (v & 0x0fff) | (((v & 0xf000) >> 12) << SRC2_OFFSET);  
+
+            break;
+        }
+
+         default:
+        {
+            printf("m unhandled operand len %d\n",instr_entry.operand_count);
+            exit(1);
+        }       
+    }
+
+    return opcode;
+}
+
 uint32_t Assembler::assemble_opcode(const std::string &instr,const std::vector<Token> &tokens)
 {
     
@@ -739,6 +839,7 @@ uint32_t Assembler::assemble_opcode(const std::string &instr,const std::vector<T
     // every opcode has the group and opcode field
     uint32_t opcode = (static_cast<uint32_t>(instr_entry.group) << 28) | (instr_entry.opcode << 24);
 
+    // change this to a fptr call from an array when we have all of them impl
     switch(instr_entry.type)
     {
 
@@ -758,6 +859,12 @@ uint32_t Assembler::assemble_opcode(const std::string &instr,const std::vector<T
         case instr_type::I: // immediate
         {
             opcode |= decode_i_instr(instr_entry,instr,tokens);
+            break;
+        }
+
+        case instr_type::M: // 16 bit imm
+        {
+            opcode |= decode_m_instr(instr_entry,instr,tokens);
             break;
         }
 

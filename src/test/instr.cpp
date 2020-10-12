@@ -69,6 +69,16 @@ struct Opcode
                 break;
             }
 
+            case instr_type::M:
+            {
+                op1 = 0;
+                op2 = 0;
+                op3 = (op >> 12) & 0xf;  
+                // encode the split imm back in to one param just because its easy
+                op4 = (op & 0x0fff) | ((op >> SRC2_OFFSET) & 0xf) << 12;               
+                break;
+            }
+
             default:
             {
                 printf("test unhandled instr decode: %d\n",static_cast<int>(type));
@@ -187,8 +197,39 @@ InstrTest instr_test_table[] =
     {Opcode(instr_group::reg_branch,0b1000,1,5,0), "robra r1, r5"},
     {Opcode(instr_group::reg_branch,0b1001,1,5,0), "rocall r1, r5"},
 
+    // mem tests
+
+    // register - immediate
+
+    {Opcode(instr_group::mem,0b0000,2,0,8,4 >> 2),"ld r8, [r2, 4]"},
+    {Opcode(instr_group::mem,0b0001,2,0,8,4 >> 1),"ldh r8, [r2, 4]"},
+    {Opcode(instr_group::mem,0b0010,2,0,8,4),"ldb r8, [r2, 4]"},
+    {Opcode(instr_group::mem,0b0011,2,0,8,4 >> 2),"st r8, [r2, 4]"},
+    {Opcode(instr_group::mem,0b0100,2,0,8,4 >> 1),"sth r8, [r2, 4]"},
+    {Opcode(instr_group::mem,0b0101,2,0,8,4),"stb r8, [r2, 4]"},
+    {Opcode(instr_group::mem,0b0110,2,0,0,4 >> 2),"ldc [r2, 4]"},
+    {Opcode(instr_group::mem,0b0111,2,0,0,4 >> 2),"stc [r2, 4]"},
+
+    // register - register
+    {Opcode(instr_group::mem,0b1000,2,4,8,0),"rld r8, [r2, r4]"},
+    {Opcode(instr_group::mem,0b1001,2,4,8,0),"rldh r8, [r2, r4]"},
+    {Opcode(instr_group::mem,0b1010,2,4,8,0),"rldb r8, [r2, r4]"},
+    {Opcode(instr_group::mem,0b1011,2,4,8,0),"rst r8, [r2, r4]"},
+    {Opcode(instr_group::mem,0b1100,2,4,8,0),"rsth r8, [r2, r4]"},
+    {Opcode(instr_group::mem,0b1101,2,4,8,0),"rstb r8, [r2, r4]"},
+    {Opcode(instr_group::mem,0b1110,0,0,8,0),"pop r8"},
+    {Opcode(instr_group::mem,0b1111,0,0,8,0),"push r8"},
 
     // mov tests
+
+    // register - immedaite
+    {Opcode(instr_group::mov,0b0000,0,0,1,5), "movi r1, 5"},
+    {Opcode(instr_group::mov,0b0001,0,0,1,5), "mti r1, 5"},
+    {Opcode(instr_group::mov,0b0010,0,0,1,5), "mfi r1, 5"},
+
+    // special
+    {Opcode(instr_group::mov,0b0011,0,0,1,0xffff), "movl r1, 0xffff"},
+    {Opcode(instr_group::mov,0b0100,0,0,1,0xffff), "movu r1, 0xffff"},
 
     // register - register
     {Opcode(instr_group::mov,0b1000,5,0,0), "mov r0, r5"},
