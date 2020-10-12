@@ -322,7 +322,16 @@ private:
         {"mfrf",Instr(instr_group::cnt,0b1011,1,instr_type::S)},
 
         // branch pc reliatve (group 1000)
-        {"bra",Instr(instr_group::rel_branch,0b0000,1,instr_type::B)}
+
+        // rel branch
+        {"bra",Instr(instr_group::rel_branch,0b0000,1,instr_type::B)},
+        {"bt",Instr(instr_group::rel_branch,0b0001,1,instr_type::B)},
+        {"bf",Instr(instr_group::rel_branch,0b0010,1,instr_type::B)},
+
+        // rel call
+        {"call",Instr(instr_group::rel_branch,0b1000,1,instr_type::B)},
+        {"ct",Instr(instr_group::rel_branch,0b1001,1,instr_type::B)},
+        {"cf",Instr(instr_group::rel_branch,0b1010,1,instr_type::B)}
     };
 
 

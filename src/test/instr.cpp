@@ -284,9 +284,18 @@ InstrTest instr_test_table[] =
 
 
 
-    // branch rel tests
+    // branch 
+    
+    // rel barnch
     {Opcode(instr_group::rel_branch,0b0000,0x8000 >> 2),"bra 0x8000"},
-    {Opcode(instr_group::rel_branch,0b0000,-0x8000 >> 2),"bra -0x8000"}
+    {Opcode(instr_group::rel_branch,0b0000,-0x8000 >> 2),"bra -0x8000"},
+    {Opcode(instr_group::rel_branch,0b0001,0x8000 >> 2),"bt 0x8000"},
+    {Opcode(instr_group::rel_branch,0b0010,0x8000 >> 2),"bf 0x8000"},
+
+    // rel call
+    {Opcode(instr_group::rel_branch,0b1000,0x8000 >> 2),"call 0x8000"},
+    {Opcode(instr_group::rel_branch,0b1001,0x8000 >> 2),"ct 0x8000"},
+    {Opcode(instr_group::rel_branch,0b1010,0x8000 >> 2),"cf 0x8000"}
 };
 
 static constexpr uint32_t INSTR_TEST_SIZE = sizeof(instr_test_table) / sizeof(instr_test_table[0]);
