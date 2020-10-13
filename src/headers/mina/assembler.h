@@ -5,6 +5,8 @@ static constexpr uint32_t SRC1_OFFSET = 20;
 static constexpr uint32_t SRC2_OFFSET = 16;
 static constexpr uint32_t DST_OFFSET = 12;
 
+// forward declare so we can take pointers on it
+class Assembler;
 
 enum class instr_group
 {
@@ -61,11 +63,6 @@ struct Symbol
     uint32_t value;
 };
 
-struct Directive
-{
-
-};
-
 
 enum class token_type
 {
@@ -73,6 +70,7 @@ enum class token_type
     sym,
     instr,
     directive,
+    str,
     reg
 };
 
@@ -85,6 +83,23 @@ struct Token
 
     token_type type;
     std::string literal;
+};
+
+// i think cause theres gonna be very little in common between these
+// its best just have a function pointer to some handler for them
+using DIRECTIVE_FPTR = void (Assembler::*)(const std::vector<Token> &tokens, uint32_t pass);
+
+struct Directive
+{
+    Directive() {}
+
+    Directive(DIRECTIVE_FPTR c) : callback(c)
+    {
+
+    }
+
+    const DIRECTIVE_FPTR callback = nullptr;
+
 };
 
 void dump_token_debug(std::vector<Token> tokens);
@@ -126,6 +141,8 @@ private:
 
     void dump_symbol_table_debug();
 
+    uint32_t read_int_operand(const Token &token,const std::string &instr);
+
     void decode_imm(std::string instr, size_t &i,std::vector<Token> &tokens);
     uint32_t decode_s_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
     uint32_t decode_b_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
@@ -133,9 +150,22 @@ private:
     uint32_t decode_m_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
     uint32_t decode_f_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
 
-    std::string file = "";
 
-    const std::unordered_map<std::string, Directive> directive_table;
+    // directives
+    void define_string(const std::vector<Token> &tokens, uint32_t pass);
+    void include_text_file(const std::vector<Token> &tokens, uint32_t pass);
+    void include_binary_file(const std::vector<Token> &tokens, uint32_t pass);
+    void equ(const std::vector<Token> &tokens, uint32_t pass);
+
+    std::vector<std::string> file_lines;
+
+    std::unordered_map<std::string, Directive> directive_table = 
+    {
+        {"string",&Assembler::define_string},
+        {"include",&Assembler::include_text_file},
+        {"file",&Assembler::include_binary_file},
+        {"equ",&Assembler::equ}
+    };
 
     std::unordered_map<std::string, uint32_t> register_table = 
     {
@@ -337,5 +367,10 @@ private:
 
     std::unordered_map<std::string, Symbol> symbol_table;
 
+    // need to record size of directives that write to output
+    // and are external to the source file
+    std::unordered_map<uint32_t,int32_t> directive_size;
+
     uint32_t offset;
+    uint32_t line;
 };

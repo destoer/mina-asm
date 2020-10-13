@@ -13,6 +13,7 @@
 #include <fstream>
 #include <vector>
 #include <unordered_map>
+#include <functional>
 
 #define UNUSED(X) ((void)X)
 
@@ -60,6 +61,24 @@ inline std::string read_file(const std::string &filename)
     return "";
 }
 
+inline std::vector<std::string> read_string_lines(const std::string &str)
+{
+    std::vector<std::string> out;
+
+    std::stringstream line_stream;
+
+    line_stream << str;
+
+    std::string line;
+    while(getline(line_stream,line))
+    {
+        out.push_back(line);
+    }
+
+    return out;
+}
+
+
 inline std::string get_binary_file_name(const std::string &filename)
 {
 	std::string save_name = filename;
@@ -91,6 +110,21 @@ inline void write_file(const std::string &filename, std::vector<uint8_t> &buf)
     fp.write((char*)buf.data(),buf.size());
 }
 
+inline int32_t get_file_size(const std::string& filename)
+{
+    std::ifstream fp(filename,std::ios::binary);
+
+    if(!fp)
+    {
+        return -1;
+    }
+
+    fp.seekg(0,std::ios::end);
+    size_t size = fp.tellg();
+    fp.close();
+
+    return size;
+}
 
 inline bool is_set(uint64_t reg, int bit) noexcept
 {

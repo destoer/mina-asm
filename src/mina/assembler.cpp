@@ -11,6 +11,11 @@ B-type: [group(4)][opcode(4)][              offset             (16)][offset(8)]
 
 
 
+// TODO
+// impl proper syntax parsing with a ast
+// and verify valid lines that way
+// rewrite error messages
+
 Assembler::Assembler(const std::string &filename)
 {
     init(filename);
@@ -18,33 +23,30 @@ Assembler::Assembler(const std::string &filename)
 
 void Assembler::init(const std::string &filename)
 {
-    file = read_file(filename);
+    file_lines = read_string_lines(read_file(filename));
 
-    std::cout << "file: " << "\n" << file << "\n\n";
-
-    if(file == "")
+    if(!file_lines.size())
     {
         printf("file %s could not be read!\n",filename.c_str());
         exit(1);
     }
 
     offset = 0;    
+    line = 0;
 }
+
 
 // first assembler pass resolve all symbols and figure out required size of the binary
 void Assembler::first_pass()
 {
 
     offset = 0;
+    line = 0;
 
-    std::stringstream file_stream;
-
-    file_stream << file;
-
-    std::string line;
-    while(getline(file_stream,line))
+    for(size_t i = 0; i < file_lines.size(); i++)
     {
-        const auto tokens = parse_tokens(line);
+        line += 1;
+        const auto tokens = parse_tokens(file_lines[i]);
 
         // nothing to do
         if(tokens.size() == 0)
@@ -62,16 +64,52 @@ void Assembler::first_pass()
                 break;
             }
 
+            case token_type::directive:
+            {
+                //dump_token_debug(tokens);
+                if(!directive_table.count(tokens[0].literal))
+                {
+                    printf("first pass could not find directive: %s\n",tokens[0].literal.c_str());
+                    exit(1);
+                }
+
+                const auto directive = directive_table[tokens[0].literal];
+
+                if(directive.callback == nullptr)
+                {
+                    printf("directive %s invalid callback!\n",tokens[0].literal.c_str());
+                    exit(1);
+                }
+
+                std::invoke(directive.callback,this,tokens,1);
+                break;
+            }
+
             // potential label definiton
             case token_type::sym:
             {
                 // search for a ':'
-                // if we dont find it then it is invalid
-                const auto idx = token.literal.find(':');
+                // if we dont find it then we have to check to see if the next token is a directive
+                // and if so invoke it
+                // this will need to be changed when we add proper syntax parsing
+                auto idx = token.literal.find(':');
                 if(idx == std::string::npos)
                 {
-                    printf("unknown instr: %s(%s)\n",token.literal.c_str(),line.c_str());
-                    exit(1);
+                    if(tokens.size() != 3)
+                    {
+                        printf("unexpected symbol: %s\n",file_lines[i].c_str());
+                        exit(1);
+                    }
+
+                    if(!directive_table.count(tokens[1].literal))
+                    {
+                        printf("unexpected symbol: %s\n",file_lines[i].c_str());
+                        exit(1);                        
+                    }
+
+                    const auto directive = directive_table[tokens[1].literal];
+                    std::invoke(directive.callback,this,tokens,1);
+                    break;
                 }
 
 
@@ -102,7 +140,7 @@ void Assembler::first_pass()
 
 void Assembler::assemble_file()
 {
-    if(file == "")
+    if(!file_lines.size())
     {
         printf("assembler: no file loaded");
         return;
@@ -111,15 +149,12 @@ void Assembler::assemble_file()
     first_pass();
 
     offset = 0;
+    line = 0;
 
-    std::stringstream file_stream;
-
-    file_stream << file;
-
-    std::string line;
-    while(getline(file_stream,line))
+    for(size_t i = 0; i < file_lines.size(); i++)
     {
-        assemble_line(line);
+        line += 1;
+        assemble_line(file_lines[i]);
     }
 }
 
@@ -149,7 +184,26 @@ std::vector<Token> Assembler::parse_tokens(const std::string &instr)
                 return tokens;
             }
 
+            case '"': // start of string literal
+            {
+                const auto idx = instr.find("\"",i);
+
+                if(idx == std::string::npos)
+                {
+                    printf("unteriminated string literal: %s\n",instr.c_str());
+                    exit(1);
+                }
+
+                std::string literal = instr.substr(i,idx-i);
+                i += literal.size()+1;
+
+                tokens.push_back(Token(literal,token_type::str));
+                break;
+            }
+
             // effectively whitespace dont care
+            case '\n':
+            case '\r':
             case ' ':
             case '\t':
             {
@@ -302,6 +356,12 @@ void dump_token_debug(std::vector<Token> tokens)
                 printf("register: %s\n",t.literal.c_str());
                 break;
             }
+
+            case token_type::str:
+            {
+                printf("string: %s\n",t.literal.c_str());
+                break;
+            }
                         
         }
     }
@@ -353,6 +413,31 @@ void Assembler::assemble_line(const std::string &instr)
             // label start (dont care)
             case token_type::sym:
             {
+                break;
+            }
+
+            // we need to handle incremeting the size here...
+            // do we wanna pass a bool to directives that tells us
+            // what pass we are on so we can act accordingly?
+            // or just have a seperate function for one handling size?
+            // or just record the size in some struct
+            case token_type::directive:
+            {
+                if(!directive_table.count(tokens[0].literal))
+                {
+                    printf("first pass could not find directive: %s\n",tokens[0].literal.c_str());
+                    exit(1);
+                }
+
+                const auto directive = directive_table[tokens[0].literal];
+
+                if(directive.callback == nullptr)
+                {
+                    printf("directive %s invalid callback!\n",tokens[0].literal.c_str());
+                    exit(1);
+                }
+
+                std::invoke(directive.callback,this,tokens,2);
                 break;
             }
 
@@ -489,33 +574,8 @@ uint32_t Assembler::decode_b_instr(const Instr &instr_entry,const std::string &i
         exit(1);
     }
 
-    int32_t v;
-    // ok now we have two options we can either get a immediate or a symbol
-    if(tokens[1].type == token_type::sym)
-    {
-        if(!symbol_table.count(tokens[1].literal))
-        {
-            printf("unrecognised symbol: %s(%s)\n",
-                tokens[1].literal.c_str(),instr.c_str());
-            exit(1);
-        }
-
-        const uint32_t cur = offset;
-        const auto target = symbol_table[tokens[1].literal].value;
-        v = target - cur;
-    }
-
-    else if(tokens[1].type == token_type::imm)
-    {
-        v = convert_imm(tokens[1].literal);
-    }
+    const int32_t v = read_int_operand(tokens[1],instr);
     
-    else
-    {
-        printf("invalid operand for branch: %s(%s)\n",tokens[1].literal.c_str(),instr.c_str());
-        exit(1);
-    }
-
 
     const auto sign = is_set(v,(sizeof(v)*8)-1);
     const int32_t branch =  (v >> 2) & (set_bit(0,24) - 1);        
@@ -578,6 +638,31 @@ uint32_t handle_i_implicit_shift(uint32_t v,uint32_t shift)
     return v >> shift;
 }
 
+uint32_t Assembler::read_int_operand(const Token &token,const std::string &instr)
+{
+    if(token.type == token_type::imm)
+    {
+        return convert_imm(token.literal);
+    }
+
+    else if(token.type == token_type::sym)
+    {
+        if(!symbol_table.count(token.literal))
+        {
+            printf("could not find symbol for imm: %s(%s)\n",token.literal.c_str(),instr.c_str());
+            exit(1);
+        }
+
+        return symbol_table[token.literal].value - offset;
+    }
+
+    else
+    {
+        printf("expected imm or symbol for operand: %s\n",instr.c_str());
+        exit(1);
+    }
+} 
+
 uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
 {
     // ok we are expecting eg addi r0, 0x1
@@ -609,26 +694,8 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
                 printf("imm: expected reg for first operand %s\n",instr.c_str());
             }
 
-            int32_t v = 0;
+            int32_t v = read_int_operand(tokens[2],instr);
             uint32_t s = 0;
-
-            if(tokens[2].type == token_type::imm)
-            {
-                v = convert_imm(tokens[2].literal); 
-            }
-
-            else if(tokens[2].type == token_type::sym)
-            {
-                puts("imm symbol unhandled");
-                exit(1);
-            }
-
-            else
-            {
-                printf("imm: expected sybmol or imm for 2nd operand: %s\n",instr.c_str());
-                exit(1);
-            }
-
 
             if(instr_entry.group == instr_group::reg_branch)
             {
@@ -720,25 +787,9 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
                 printf("imm: expected reg for first and 2nd operand %s\n",instr.c_str());
             }
 
-            int32_t v = 0;
+            int32_t v = read_int_operand(tokens[3],instr);;
             uint32_t s = 0;
 
-            if(tokens[3].type == token_type::imm)
-            {
-                v = convert_imm(tokens[3].literal); 
-            }
-
-            else if(tokens[3].type == token_type::sym)
-            {
-                puts("imm symbol unhandled");
-                exit(1);
-            }
-
-            else
-            {
-                printf("imm: expected sybmol or imm for 3rd operand: %s\n",instr.c_str());
-                exit(1);
-            }
 
             if(instr_entry.group == instr_group::mem)
             {
@@ -809,24 +860,7 @@ uint32_t Assembler::decode_m_instr(const Instr &instr_entry,const std::string &i
                 printf("m: expected reg for first operand %s\n",instr.c_str());
             }
 
-            uint32_t v = 0;
-
-            if(tokens[2].type == token_type::imm)
-            {
-                v = convert_imm(tokens[2].literal); 
-            }
-
-            else if(tokens[2].type == token_type::sym)
-            {
-                puts("m symbol unhandled");
-                exit(1);
-            }
-
-            else
-            {
-                printf("m: expected sybmol or imm for 2nd operand: %s\n",instr.c_str());
-                exit(1);
-            }
+            const uint32_t v = read_int_operand(tokens[2],instr);
 
             // max 16 bit unsigned imm
             if(v >= set_bit(0,16))
@@ -874,24 +908,7 @@ uint32_t Assembler::decode_f_instr(const Instr &instr_entry,const std::string &i
                 printf("f: expected reg for 1st,2nd and 3rd operand %s\n",instr.c_str());
             }
 
-            int32_t v = 0;
-
-            if(tokens[4].type == token_type::imm)
-            {
-                v = convert_imm(tokens[4].literal); 
-            }
-
-            else if(tokens[4].type == token_type::sym)
-            {
-                puts("f symbol unhandled");
-                exit(1);
-            }
-
-            else
-            {
-                printf("f: expected sybmol or imm for 3rd operand: %s\n",instr.c_str());
-                exit(1);
-            }
+            const int32_t v = read_int_operand(tokens[4],instr);
 
         
             // dest = op1, src1 = op2, src2 = op3
