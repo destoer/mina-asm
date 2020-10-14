@@ -43,6 +43,8 @@ void Assembler::first_pass()
     offset = 0;
     line = 0;
 
+    // lines have to be parsed this way incase the include directive
+    // jams extra lines into it
     for(size_t i = 0; i < file_lines.size(); i++)
     {
         line += 1;
@@ -278,7 +280,6 @@ std::vector<Token> Assembler::parse_tokens(const std::string &instr)
                     // then if it is a directive
                     // then a register
                     // else a symbol
-                    // otherwhise it is unrecognized
 
                     if(instr_table.count(literal))
                     {
@@ -299,9 +300,6 @@ std::vector<Token> Assembler::parse_tokens(const std::string &instr)
                     {
                         tokens.push_back(Token(literal,token_type::sym));
                     }
-                    
-
-
                 }
 
                 else // something has gone wrong
@@ -416,11 +414,6 @@ void Assembler::assemble_line(const std::string &instr)
                 break;
             }
 
-            // we need to handle incremeting the size here...
-            // do we wanna pass a bool to directives that tells us
-            // what pass we are on so we can act accordingly?
-            // or just have a seperate function for one handling size?
-            // or just record the size in some struct
             case token_type::directive:
             {
                 if(!directive_table.count(tokens[0].literal))
@@ -450,193 +443,6 @@ void Assembler::assemble_line(const std::string &instr)
     }
 }
 
-uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
-{
-    uint32_t opcode = 0;
-
-    // verify we actually have enough operands to assemble this
-    if(instr_entry.operand_count != tokens.size()-1)
-    {
-        printf("[S-type-instr] expected %d operands got %zd (%s)\n",
-            instr_entry.operand_count,tokens.size()-1,instr.c_str());
-        exit(1);
-    }
-
-    // verfiy all operands are registers
-    for(size_t i = 1; i < tokens.size(); i++)
-    {
-        if(tokens[i].type != token_type::reg)
-        {
-            printf("[S-type-instr] expected register operand\n");
-            exit(1);
-        }
-    }
-
-
-    switch(instr_entry.operand_count)
-    {
-        // dont know 1 operand is consistant
-        case 1: // dest = op1, everything else zero
-        {
-            opcode |= register_table[tokens[1].literal] << DST_OFFSET;
-            break;
-        }
-
-        // register - register encoding is not consistant across groups for
-        // 2 operands...
-        // for now we will do this with a switch but it would be nicer to encode this
-        // with a lut
-        case 2: 
-        {
-            switch(instr_entry.group)
-            {
-                case instr_group::mov: // src2 empty, dest = op1, src1 = op2
-                {
-                    opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
-                        (register_table[tokens[2].literal] << SRC1_OFFSET);
-                    break;                    
-                }
-
-                case instr_group::arith: // src2 op2, dest = op1, src1 = empty
-                {
-                    opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
-                        (register_table[tokens[2].literal] << SRC2_OFFSET);
-                    break;                                    
-                }
-
-                case instr_group::logic: // src2 empty, dest = op1, src1 = op2
-                {
-                    opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
-                        (register_table[tokens[2].literal] << SRC1_OFFSET);
-                    break;
-                }
-
-                case instr_group::cmp: // src2 op2, dest = empty, src1 = op1
-                {
-                    opcode |= (register_table[tokens[1].literal] << SRC1_OFFSET) | 
-                        (register_table[tokens[2].literal] << SRC2_OFFSET);
-                    break;
-                }
-
-                case instr_group::reg_branch: // src2 op2, dest = empty, src1 = op1
-                {
-                    opcode |= (register_table[tokens[1].literal] << SRC1_OFFSET) | 
-                        (register_table[tokens[2].literal] << SRC2_OFFSET);
-                    break;
-                }
-
-                case instr_group::cnt:
-                {
-                    opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
-                        (register_table[tokens[2].literal] << SRC1_OFFSET);
-                    break;                               
-                }
-
-                default:
-                {
-                    printf("s type 2 operand group unhandled: %d\n",static_cast<int>(instr_entry.group));
-                    exit(1);
-                }
-            }
-
-
-            break;
-        }
-
-        case 3: // dest = op1, src1 = op2, src2 = op3
-        {
-            opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
-                (register_table[tokens[2].literal] << SRC1_OFFSET) |
-                (register_table[tokens[3].literal] << SRC2_OFFSET);                        
-            break;
-        }
-
-        default: 
-        {
-            printf("S type unhandled operand count %d(%s)\n",instr_entry.operand_count,instr.c_str());
-            break;
-        }
-    }    
-
-    return opcode;
-}
-
-uint32_t Assembler::decode_b_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
-{   
-    UNUSED(instr_entry);
-
-    uint32_t opcode = 0;
-
-    // we should only have one operand for a branch
-    if(tokens.size() -1 != 1)
-    {
-        printf("branch: expected 1 operand but got: %zd\n",tokens.size()-1);
-        exit(1);
-    }
-
-    const int32_t v = read_int_operand(tokens[1],instr);
-    
-
-    const auto sign = is_set(v,(sizeof(v)*8)-1);
-    const int32_t branch =  (v >> 2) & (set_bit(0,24) - 1);        
-    const int32_t final_branch = sign? set_bit(branch,23) : deset_bit(branch,23);
-
-    //24 bit imm added to pc to reach target
-    // left shifed by two then sign extended
-    if(abs(v) > set_bit(0,22))
-    {
-        printf("cannot represent relative branch in 26 bit signed op: %x\n",v);
-        exit(1);
-    }
-
-    opcode |= final_branch;
-
-    return opcode;
-}
-
-// look for a more mathy way to do this (brute force with a loop is slow for obvious reasons)
-// needs unit tests
-bool encode_i_type_operand(int32_t &v, uint32_t &s)
-{
-    // ok so we have a 4 bit shift and 12 bit signed imm
-    // to encode V into
-
-    const auto sign = is_set(v,(sizeof(v)*8)-1);
-
-    // what this effectively means is we need to check if the number can fit into a 12bit imm
-    // and keep shifting it down up to 15 unti it does if it cant then it is invalid
-    for(s = 0; s < 16; s++)
-    {
-        if(abs(v) <= set_bit(0,10)-1)
-        {
-            v = sign? set_bit(v,11) : deset_bit(v,11); 
-            v &= set_bit(0,12)-1;
-            return true;
-        }
-
-        // if we have a right side carry then its not possible to encode
-        if(is_set(abs(v),0))
-        {
-            return false;
-        }
-
-        v >>= 1;
-    }
-
-    return false;
-}
-
-
-uint32_t handle_i_implicit_shift(uint32_t v,uint32_t shift)
-{
-    if( (v & (set_bit(0,shift)-1)) > 0)
-    {
-        printf("implicit shift cannot encode i type operand\n");
-        exit(1);
-    }
-
-    return v >> shift;
-}
 
 uint32_t Assembler::read_int_operand(const Token &token,const std::string &instr)
 {
@@ -663,275 +469,6 @@ uint32_t Assembler::read_int_operand(const Token &token,const std::string &instr
     }
 } 
 
-uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
-{
-    // ok we are expecting eg addi r0, 0x1
-
-    uint32_t opcode = 0;
-
-    // at some point we wanna handle having operands implicitly
-    // eg addi r0, r0, 1 = addi r0, 1
-    if(tokens.size()-1 != instr_entry.operand_count)
-    {
-        printf("imm: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
-        exit(1);
-    }    
-
-    switch(instr_entry.operand_count)
-    {
-        case 0: // eg nop
-        {
-            // no params so we have nothing to do
-            break;
-        }
-
-
-        case 2:
-        {
-            // ok we are expecting one reg followed by a imm or symbol
-            if(tokens[1].type != token_type::reg)
-            {
-                printf("imm: expected reg for first operand %s\n",instr.c_str());
-            }
-
-            int32_t v = read_int_operand(tokens[2],instr);
-            uint32_t s = 0;
-
-            if(instr_entry.group == instr_group::reg_branch)
-            {
-                v = handle_i_implicit_shift(v,reg_branch_shift[instr_entry.opcode]);
-            }
-
-            else if(instr_entry.group == instr_group::mem)
-            {
-                v = handle_i_implicit_shift(v,mem_shift[instr_entry.opcode]);
-            }
-
-
-
-
-            const auto success = encode_i_type_operand(v,s);
-
-            // TODO add psuedo op that will encode ones too large
-            // into several instrs
-            if(!success)
-            {
-                printf("cannot encode i type operand: %d\n",v);
-                exit(1);
-            }
-        
-
-
-            // we should again probably use a lut for where to put the operands 
-            // but use a switch for now
-            switch(instr_entry.group)
-            {
-
-                case instr_group::arith:
-                {
-                    opcode |= register_table[tokens[1].literal]  << DST_OFFSET
-                        | v | (s << 16); // encode imm and shift
-                    break;
-                }
-
-                case instr_group::logic:
-                {
-                    opcode |= register_table[tokens[1].literal]  << DST_OFFSET 
-                        | v | (s << 16); // encode imm and shift
-                    break;
-                }
-
-                case instr_group::cmp:
-                {
-                    opcode |= register_table[tokens[1].literal]  << SRC1_OFFSET 
-                        | v | (s << 16); // encode imm and shift
-                    break;
-                }
-
-                case instr_group::reg_branch:
-                {
-                    opcode |= register_table[tokens[1].literal]  << SRC1_OFFSET 
-                        | v | (s << 16); // encode imm and shift
-                    break;
-                }
-
-                case instr_group::mem:
-                {
-                    opcode |= register_table[tokens[1].literal]  << SRC1_OFFSET 
-                        | v | (s << 16); // encode imm and shift                    
-                    break;
-                }
-
-                case instr_group::mov:
-                {
-                    opcode |= register_table[tokens[1].literal]  << DST_OFFSET 
-                        | v | (s << 16); // encode imm and shift
-                    break;                    
-                }
-
-                default:
-                {
-                    printf("i type 2 operand group unhandled: %d\n",static_cast<int>(instr_entry.group));
-                    exit(1);
-                }
-
-            }
-            break;
-        }
-
-        case 3:
-        {
-            // ok we are expecting two regs followed by a imm or symbol
-            if(tokens[1].type != token_type::reg || tokens[2].type != token_type::reg)
-            {
-                printf("imm: expected reg for first and 2nd operand %s\n",instr.c_str());
-            }
-
-            int32_t v = read_int_operand(tokens[3],instr);;
-            uint32_t s = 0;
-
-
-            if(instr_entry.group == instr_group::mem)
-            {
-                v = handle_i_implicit_shift(v,mem_shift[instr_entry.opcode]);
-            }
-
-            if(instr_entry.group != instr_group::shift)
-            {
-                const auto success = encode_i_type_operand(v,s);
-                // TODO add psuedo op that will encode ones too large
-                // into several instrs
-                if(!success)
-                {
-                    printf("cannot encode i type operand: %d\n",v);
-                    exit(1);
-                }
-
-            }
-
-            // for shifts we only want the shift field and to ignore the imm
-            else
-            {
-                s = v;
-                v = 0;
-
-                if(s > 0xf)
-                {
-                    printf("shift imm: out of range shift: %d\n",s);
-                }
-            }
-
-            opcode |= register_table[tokens[1].literal]  << DST_OFFSET // dst
-                | register_table[tokens[2].literal] << SRC1_OFFSET // src
-                | v | (s << 16); // encode imm and shift
-            break;
-        }
-
-        default:
-        {
-            printf("imm unhandled operand len %d\n",instr_entry.operand_count);
-            exit(1);
-        }
-    }
-
-    return opcode;
-}
-
-// atm this is only used for mov in the isa spec
-uint32_t Assembler::decode_m_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
-{
-    uint32_t opcode = 0;
-
-
-    if(tokens.size()-1 != instr_entry.operand_count)
-    {
-        printf("m: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
-        exit(1);
-    }    
-
-    switch(instr_entry.operand_count)
-    {
-
-        case 2:
-        {
-            // ok we are expecting one reg followed by a imm or symbol
-            if(tokens[1].type != token_type::reg)
-            {
-                printf("m: expected reg for first operand %s\n",instr.c_str());
-            }
-
-            const uint32_t v = read_int_operand(tokens[2],instr);
-
-            // max 16 bit unsigned imm
-            if(v >= set_bit(0,16))
-            {
-                printf("cannot encode m type operand: %d\n",v);
-            }
-
-            // lower 12 bit at bottom of op
-            // upper 4 where src2 field normally is
-            opcode |= register_table[tokens[1].literal] << DST_OFFSET |
-                (v & 0x0fff) | (((v & 0xf000) >> 12) << SRC2_OFFSET);  
-
-            break;
-        }
-
-         default:
-        {
-            printf("m unhandled operand len %d\n",instr_entry.operand_count);
-            exit(1);
-        }       
-    }
-
-    return opcode;
-}
-
-// currently only used for shifts
-uint32_t Assembler::decode_f_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
-{
-    uint32_t opcode = 0;
-
-    if(tokens.size()-1 != instr_entry.operand_count)
-    {
-        printf("f: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
-        exit(1);
-    }    
-
-    switch(instr_entry.operand_count)
-    {
-
-        case 4:
-        {
-            // ok we are expecting two regs followed by a imm or symbol
-            if(tokens[1].type != token_type::reg || tokens[2].type != token_type::reg || tokens[3].type != token_type::reg)
-            {
-                printf("f: expected reg for 1st,2nd and 3rd operand %s\n",instr.c_str());
-            }
-
-            const int32_t v = read_int_operand(tokens[4],instr);
-
-        
-            // dest = op1, src1 = op2, src2 = op3
-            opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
-                (register_table[tokens[2].literal] << SRC1_OFFSET) |
-                (register_table[tokens[3].literal] << SRC2_OFFSET) |
-                v << 8; // rshift 8 bits in                       
-        
-            break;
-        }
-
-        default:
-        {
-            printf("m unhandled operand len %d\n",instr_entry.operand_count);
-            exit(1);            
-            break;
-        }
-    }
-
-
-
-    return opcode;
-}
 
 uint32_t Assembler::assemble_opcode(const std::string &instr,const std::vector<Token> &tokens)
 {
@@ -944,50 +481,19 @@ uint32_t Assembler::assemble_opcode(const std::string &instr,const std::vector<T
     uint32_t opcode = (static_cast<uint32_t>(instr_entry.group) << 28) | (instr_entry.opcode << 24);
 
     // change this to a fptr call from an array when we have all of them impl
-    switch(instr_entry.type)
+
+    using INSTR_ASSEMBLE = uint32_t (Assembler::*)(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
+
+    INSTR_ASSEMBLE instr_assemble_table[5] = 
     {
+        &Assembler::decode_s_instr,
+        &Assembler::decode_i_instr,
+        &Assembler::decode_m_instr,
+        &Assembler::decode_f_instr,
+        &Assembler::decode_b_instr
+    };
 
-        case instr_type::S: // register to register opcodes
-        {
-            opcode |= decode_s_instr(instr_entry,instr,tokens);
-            break;
-        }
-
-
-        case instr_type::B: // relative branch
-        {
-            opcode |= decode_b_instr(instr_entry,instr,tokens);
-            break;
-        }
-
-        case instr_type::I: // immediate
-        {
-            opcode |= decode_i_instr(instr_entry,instr,tokens);
-            break;
-        }
-
-        case instr_type::M: // 16 bit imm
-        {
-            opcode |= decode_m_instr(instr_entry,instr,tokens);
-            break;
-        }
-
-        case instr_type::F: // funnel shift
-        {
-            opcode |= decode_f_instr(instr_entry,instr,tokens);
-            break;
-        }
-
-        default:
-        {
-            printf("unhandled opcode type: %d(%s)\n",static_cast<int>(instr_entry.type),instr.c_str());
-            dump_symbol_table_debug();
-            exit(1);
-        }
-
-        break;
-        
-    }
+    opcode |= std::invoke(instr_assemble_table[static_cast<int>(instr_entry.type)],this,instr_entry,instr,tokens);
 
     return opcode;
 }
