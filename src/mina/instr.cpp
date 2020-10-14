@@ -35,19 +35,18 @@ bool encode_i_type_operand(int32_t &v, uint32_t &s)
 }
 
 
-uint32_t handle_i_implicit_shift(uint32_t v,uint32_t shift)
+uint32_t Assembler::handle_i_implicit_shift(uint32_t v,uint32_t shift)
 {
     if( (v & (set_bit(0,shift)-1)) > 0)
     {
-        printf("implicit shift cannot encode i type operand\n");
-        exit(1);
+        die("implicit shift cannot encode i type operand\n");
     }
 
     return v >> shift;
 }
 
 
-uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
+uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::vector<Token> &tokens)
 {
     // ok we are expecting eg addi r0, 0x1
 
@@ -57,8 +56,7 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
     // eg addi r0, r0, 1 = addi r0, 1
     if(tokens.size()-1 != instr_entry.operand_count)
     {
-        printf("imm: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
-        exit(1);
+        die("imm: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
     }    
 
     switch(instr_entry.operand_count)
@@ -75,10 +73,10 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
             // ok we are expecting one reg followed by a imm or symbol
             if(tokens[1].type != token_type::reg)
             {
-                printf("imm: expected reg for first operand %s\n",instr.c_str());
+                die("imm: expected reg for first operand\n");
             }
 
-            int32_t v = read_int_operand(tokens[2],instr);
+            int32_t v = read_int_operand(tokens[2]);
             uint32_t s = 0;
 
             if(instr_entry.group == instr_group::reg_branch)
@@ -100,8 +98,7 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
             // into several instrs
             if(!success)
             {
-                printf("cannot encode i type operand: %d\n",v);
-                exit(1);
+                die("cannot encode i type operand: %d\n",v);
             }
         
             static constexpr int32_t reg_field_table[9] = 
@@ -121,9 +118,7 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
 
             if(operand_shift == -1)
             {
-
-                printf("i type 2 operand group unhandled: %d\n",static_cast<int>(instr_entry.group));
-                exit(1);
+                die("i type 2 operand group unhandled: %d\n",static_cast<int>(instr_entry.group));
             }
 
             opcode |= register_table[tokens[1].literal] << operand_shift
@@ -137,10 +132,10 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
             // ok we are expecting two regs followed by a imm or symbol
             if(tokens[1].type != token_type::reg || tokens[2].type != token_type::reg)
             {
-                printf("imm: expected reg for first and 2nd operand %s\n",instr.c_str());
+                printf("imm: expected reg for first and 2nd operand\n");
             }
 
-            int32_t v = read_int_operand(tokens[3],instr);;
+            int32_t v = read_int_operand(tokens[3]);
             uint32_t s = 0;
 
 
@@ -156,8 +151,7 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
                 // into several instrs
                 if(!success)
                 {
-                    printf("cannot encode i type operand: %d\n",v);
-                    exit(1);
+                    die("cannot encode i type operand: %d\n",v);
                 }
 
             }
@@ -170,7 +164,7 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
 
                 if(s > 0xf)
                 {
-                    printf("shift imm: out of range shift: %d\n",s);
+                    die("shift imm: out of range shift: %d\n",s);
                 }
             }
 
@@ -182,8 +176,7 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
 
         default:
         {
-            printf("imm unhandled operand len %d\n",instr_entry.operand_count);
-            exit(1);
+            die("imm unhandled operand len %d\n",instr_entry.operand_count);
         }
     }
 
@@ -191,15 +184,14 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::string &i
 }
 
 // atm this is only used for mov in the isa spec
-uint32_t Assembler::decode_m_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
+uint32_t Assembler::decode_m_instr(const Instr &instr_entry,const std::vector<Token> &tokens)
 {
     uint32_t opcode = 0;
 
 
     if(tokens.size()-1 != instr_entry.operand_count)
     {
-        printf("m: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
-        exit(1);
+        die("m: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
     }    
 
     switch(instr_entry.operand_count)
@@ -210,15 +202,15 @@ uint32_t Assembler::decode_m_instr(const Instr &instr_entry,const std::string &i
             // ok we are expecting one reg followed by a imm or symbol
             if(tokens[1].type != token_type::reg)
             {
-                printf("m: expected reg for first operand %s\n",instr.c_str());
+               die("m: expected reg for first operand\n");
             }
 
-            const uint32_t v = read_int_operand(tokens[2],instr);
+            const uint32_t v = read_int_operand(tokens[2]);
 
             // max 16 bit unsigned imm
             if(v >= set_bit(0,16))
             {
-                printf("cannot encode m type operand: %d\n",v);
+                die("cannot encode m type operand: %d\n",v);
             }
 
             // lower 12 bit at bottom of op
@@ -231,8 +223,7 @@ uint32_t Assembler::decode_m_instr(const Instr &instr_entry,const std::string &i
 
          default:
         {
-            printf("m unhandled operand len %d\n",instr_entry.operand_count);
-            exit(1);
+            die("m unhandled operand len %d\n",instr_entry.operand_count);
         }       
     }
 
@@ -240,14 +231,13 @@ uint32_t Assembler::decode_m_instr(const Instr &instr_entry,const std::string &i
 }
 
 // currently only used for shifts
-uint32_t Assembler::decode_f_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
+uint32_t Assembler::decode_f_instr(const Instr &instr_entry,const std::vector<Token> &tokens)
 {
     uint32_t opcode = 0;
 
     if(tokens.size()-1 != instr_entry.operand_count)
     {
-        printf("f: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
-        exit(1);
+        die("f: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
     }    
 
     switch(instr_entry.operand_count)
@@ -258,10 +248,10 @@ uint32_t Assembler::decode_f_instr(const Instr &instr_entry,const std::string &i
             // ok we are expecting two regs followed by a imm or symbol
             if(tokens[1].type != token_type::reg || tokens[2].type != token_type::reg || tokens[3].type != token_type::reg)
             {
-                printf("f: expected reg for 1st,2nd and 3rd operand %s\n",instr.c_str());
+                die("f: expected reg for 1st,2nd and 3rd operand\n");
             }
 
-            const int32_t v = read_int_operand(tokens[4],instr);
+            const int32_t v = read_int_operand(tokens[4]);
 
         
             // dest = op1, src1 = op2, src2 = op3
@@ -275,8 +265,7 @@ uint32_t Assembler::decode_f_instr(const Instr &instr_entry,const std::string &i
 
         default:
         {
-            printf("m unhandled operand len %d\n",instr_entry.operand_count);
-            exit(1);            
+            die("m unhandled operand len %d\n",instr_entry.operand_count);           
             break;
         }
     }
@@ -287,16 +276,15 @@ uint32_t Assembler::decode_f_instr(const Instr &instr_entry,const std::string &i
 }
 
 
-uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
+uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::vector<Token> &tokens)
 {
     uint32_t opcode = 0;
 
     // verify we actually have enough operands to assemble this
     if(instr_entry.operand_count != tokens.size()-1)
     {
-        printf("[S-type-instr] expected %d operands got %zd (%s)\n",
-            instr_entry.operand_count,tokens.size()-1,instr.c_str());
-        exit(1);
+        die("[S-type-instr] expected %d operands got %zd\n",
+            instr_entry.operand_count,tokens.size()-1);
     }
 
     // verfiy all operands are registers
@@ -304,8 +292,7 @@ uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::string &i
     {
         if(tokens[i].type != token_type::reg)
         {
-            printf("[S-type-instr] expected register operand\n");
-            exit(1);
+            die("[S-type-instr] expected register operand\n");
         }
     }
 
@@ -344,8 +331,7 @@ uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::string &i
 
             if(operand1 == -1)
             {
-                printf("s type 2 operand group unhandled: %d\n",static_cast<int>(instr_entry.group));
-                exit(1);                
+                die("s type 2 operand group unhandled: %d\n",static_cast<int>(instr_entry.group));               
             }
 
             opcode |= (register_table[tokens[1].literal] << operand1) | 
@@ -364,7 +350,7 @@ uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::string &i
 
         default: 
         {
-            printf("S type unhandled operand count %d(%s)\n",instr_entry.operand_count,instr.c_str());
+            printf("S type unhandled operand count %d\n",instr_entry.operand_count);
             break;
         }
     }    
@@ -372,7 +358,7 @@ uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::string &i
     return opcode;
 }
 
-uint32_t Assembler::decode_b_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens)
+uint32_t Assembler::decode_b_instr(const Instr &instr_entry,const std::vector<Token> &tokens)
 {   
     UNUSED(instr_entry);
 
@@ -381,11 +367,10 @@ uint32_t Assembler::decode_b_instr(const Instr &instr_entry,const std::string &i
     // we should only have one operand for a branch
     if(tokens.size() -1 != 1)
     {
-        printf("branch: expected 1 operand but got: %zd\n",tokens.size()-1);
-        exit(1);
+        die("branch: expected 1 operand but got: %zd\n",tokens.size()-1);
     }
 
-    const int32_t v = read_int_operand(tokens[1],instr);
+    const int32_t v = read_int_operand(tokens[1]);
     
 
     const auto sign = is_set(v,(sizeof(v)*8)-1);
@@ -396,8 +381,7 @@ uint32_t Assembler::decode_b_instr(const Instr &instr_entry,const std::string &i
     // left shifed by two then sign extended
     if(abs(v) > set_bit(0,22))
     {
-        printf("cannot represent relative branch in 26 bit signed op: %x\n",v);
-        exit(1);
+        die("cannot represent relative branch in 26 bit signed op: %x\n",v);
     }
 
     opcode |= final_branch;

@@ -1,4 +1,5 @@
 #include <mina/assembler.h>
+#include <stdarg.h>
 
 //https://github.com/ladystarbreeze/mina-isa/blob/main/MINA_Instruction_Set_Architecture.md
 /*
@@ -36,6 +37,20 @@ void Assembler::init(const std::string &filename)
 }
 
 
+void Assembler::die(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+
+    vprintf(format, args);
+
+    va_end(args);
+
+    printf("line %d: '%s'\n",line-1, file_lines[line-1].c_str());
+
+    exit(1);
+}
+
 // first assembler pass resolve all symbols and figure out required size of the binary
 void Assembler::first_pass()
 {
@@ -71,16 +86,14 @@ void Assembler::first_pass()
                 //dump_token_debug(tokens);
                 if(!directive_table.count(tokens[0].literal))
                 {
-                    printf("first pass could not find directive: %s\n",tokens[0].literal.c_str());
-                    exit(1);
+                    die("first pass could not find directive: %s\n",tokens[0].literal.c_str());
                 }
 
                 const auto directive = directive_table[tokens[0].literal];
 
                 if(directive.callback == nullptr)
                 {
-                    printf("directive %s invalid callback!\n",tokens[0].literal.c_str());
-                    exit(1);
+                    die("directive %s invalid callback!\n",tokens[0].literal.c_str());
                 }
 
                 std::invoke(directive.callback,this,tokens,1);
@@ -99,14 +112,13 @@ void Assembler::first_pass()
                 {
                     if(tokens.size() != 3)
                     {
-                        printf("unexpected symbol: %s\n",file_lines[i].c_str());
-                        exit(1);
+                        die("unexpected symbol\n");
+
                     }
 
                     if(!directive_table.count(tokens[1].literal))
                     {
-                        printf("unexpected symbol: %s\n",file_lines[i].c_str());
-                        exit(1);                        
+                        die("unexpected symbol");              
                     }
 
                     const auto directive = directive_table[tokens[1].literal];
@@ -118,8 +130,7 @@ void Assembler::first_pass()
                 // valid label add it to the symbol table if not allready defined
                 if(symbol_table.count(token.literal))
                 {
-                    printf("redefinition of symbol: %s\n",token.literal.c_str());
-                    exit(1);
+                    die("redefinition of symbol: %s\n",token.literal.c_str());
                 }
 
                 token.literal = token.literal.substr(0,idx); 
@@ -131,8 +142,7 @@ void Assembler::first_pass()
 
             default:
             {
-                puts("first parse unhandled token");
-                exit(1);
+                die("first parse unhandled token");
             }
         }        
     }
@@ -192,8 +202,7 @@ std::vector<Token> Assembler::parse_tokens(const std::string &instr)
 
                 if(idx == std::string::npos)
                 {
-                    printf("unteriminated string literal: %s\n",instr.c_str());
-                    exit(1);
+                    die("unteriminated string literal");
                 }
 
                 std::string literal = instr.substr(i,idx-i);
@@ -217,7 +226,7 @@ std::vector<Token> Assembler::parse_tokens(const std::string &instr)
                 // we want to reject this if we havent found any tokens yet
                 if(tokens.size() == 0)
                 {
-                    printf("unexpected char ',' in line: %s\n",instr.c_str());
+                    die("unexpected char ',' in line\n");
                 }
                 break;
             }
@@ -245,13 +254,13 @@ std::vector<Token> Assembler::parse_tokens(const std::string &instr)
 
                     else
                     {
-                        printf("expected char '-' in line: %s\n",instr.c_str());
+                        die("expected char '-' in line\n");
                     }
                 }
 
                 else
                 {
-                    printf("unexpected char '-' at end of line: %s\n",instr.c_str());
+                    die("unexpected char '-' at end of line\n");
                 }
                 break;
             }
@@ -304,8 +313,7 @@ std::vector<Token> Assembler::parse_tokens(const std::string &instr)
 
                 else // something has gone wrong
                 {
-                    printf("illegal token: '%c'", c);
-                    exit(1);
+                    die("illegal token: '%c'", c);
                 }
 
 
@@ -398,7 +406,7 @@ void Assembler::assemble_line(const std::string &instr)
         {
             case token_type::instr:
             {
-                const auto opcode = assemble_opcode(instr,tokens);
+                const auto opcode = assemble_opcode(tokens);
 
                 write_vec(output,offset,opcode);
 
@@ -418,16 +426,14 @@ void Assembler::assemble_line(const std::string &instr)
             {
                 if(!directive_table.count(tokens[0].literal))
                 {
-                    printf("first pass could not find directive: %s\n",tokens[0].literal.c_str());
-                    exit(1);
+                    die("first pass could not find directive: %s\n",tokens[0].literal.c_str());
                 }
 
                 const auto directive = directive_table[tokens[0].literal];
 
                 if(directive.callback == nullptr)
                 {
-                    printf("directive %s invalid callback!\n",tokens[0].literal.c_str());
-                    exit(1);
+                    die("directive %s invalid callback!\n",tokens[0].literal.c_str());
                 }
 
                 std::invoke(directive.callback,this,tokens,2);
@@ -436,15 +442,14 @@ void Assembler::assemble_line(const std::string &instr)
 
             default:
             {
-                printf("unknown token start %d\n",static_cast<int>(tokens[0].type));
-                exit(1);
+                die("unknown token start %d\n",static_cast<int>(tokens[0].type));
             }
         }
     }
 }
 
 
-uint32_t Assembler::read_int_operand(const Token &token,const std::string &instr)
+uint32_t Assembler::read_int_operand(const Token &token)
 {
     if(token.type == token_type::imm)
     {
@@ -455,8 +460,7 @@ uint32_t Assembler::read_int_operand(const Token &token,const std::string &instr
     {
         if(!symbol_table.count(token.literal))
         {
-            printf("could not find symbol for imm: %s(%s)\n",token.literal.c_str(),instr.c_str());
-            exit(1);
+            die("could not find symbol for imm: %s\n",token.literal.c_str());
         }
 
         return symbol_table[token.literal].value - offset;
@@ -464,13 +468,13 @@ uint32_t Assembler::read_int_operand(const Token &token,const std::string &instr
 
     else
     {
-        printf("expected imm or symbol for operand: %s\n",instr.c_str());
-        exit(1);
+        die("expected imm or symbol for operand\n");
+        return 0;
     }
 } 
 
 
-uint32_t Assembler::assemble_opcode(const std::string &instr,const std::vector<Token> &tokens)
+uint32_t Assembler::assemble_opcode(const std::vector<Token> &tokens)
 {
     
     //dump_token_debug(tokens);
@@ -482,7 +486,7 @@ uint32_t Assembler::assemble_opcode(const std::string &instr,const std::vector<T
 
     // change this to a fptr call from an array when we have all of them impl
 
-    using INSTR_ASSEMBLE = uint32_t (Assembler::*)(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
+    using INSTR_ASSEMBLE = uint32_t (Assembler::*)(const Instr &instr_entry,const std::vector<Token> &tokens);
 
     INSTR_ASSEMBLE instr_assemble_table[5] = 
     {
@@ -493,7 +497,7 @@ uint32_t Assembler::assemble_opcode(const std::string &instr,const std::vector<T
         &Assembler::decode_b_instr
     };
 
-    opcode |= std::invoke(instr_assemble_table[static_cast<int>(instr_entry.type)],this,instr_entry,instr,tokens);
+    opcode |= std::invoke(instr_assemble_table[static_cast<int>(instr_entry.type)],this,instr_entry,tokens);
 
     return opcode;
 }

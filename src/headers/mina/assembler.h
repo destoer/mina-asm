@@ -116,7 +116,7 @@ public:
     void init(const std::string &filename);
     
     void assemble_file();
-    uint32_t assemble_opcode(const std::string &instr,const std::vector<Token> &tokens);
+    uint32_t assemble_opcode(const std::vector<Token> &tokens);
 
     void write_binary(const std::string &filename);
     std::vector<Token> parse_tokens(const std::string &instr);
@@ -135,20 +135,23 @@ public:
     }
 
 private:
+    void die(const char *format, ...);
+
     void assemble_line(const std::string &line);
 
     void first_pass();
 
     void dump_symbol_table_debug();
 
-    uint32_t read_int_operand(const Token &token,const std::string &instr);
+    uint32_t read_int_operand(const Token &token);
+    uint32_t handle_i_implicit_shift(uint32_t v,uint32_t shift);
 
     void decode_imm(std::string instr, size_t &i,std::vector<Token> &tokens);
-    uint32_t decode_s_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
-    uint32_t decode_b_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
-    uint32_t decode_i_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
-    uint32_t decode_m_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
-    uint32_t decode_f_instr(const Instr &instr_entry,const std::string &instr,const std::vector<Token> &tokens);
+    uint32_t decode_s_instr(const Instr &instr_entry,const std::vector<Token> &tokens);
+    uint32_t decode_b_instr(const Instr &instr_entry,const std::vector<Token> &tokens);
+    uint32_t decode_i_instr(const Instr &instr_entry,const std::vector<Token> &tokens);
+    uint32_t decode_m_instr(const Instr &instr_entry,const std::vector<Token> &tokens);
+    uint32_t decode_f_instr(const Instr &instr_entry,const std::vector<Token> &tokens);
 
 
     // directives

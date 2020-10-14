@@ -314,7 +314,7 @@ void instr_test()
             exit(1);
         }
         Opcode op;
-        const auto v = assembler.assemble_opcode(test.line,tokens);
+        const auto v = assembler.assemble_opcode(tokens);
         op.decode_op(v,assembler.get_instr_entry(tokens[0].literal).type);
     
         if(op == test.expected)
