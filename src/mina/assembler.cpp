@@ -84,18 +84,8 @@ void Assembler::first_pass()
             case token_type::directive:
             {
                 //dump_token_debug(tokens);
-                if(!directive_table.count(tokens[0].literal))
-                {
-                    die("first pass could not find directive: %s\n",tokens[0].literal.c_str());
-                }
 
                 const auto directive = directive_table[tokens[0].literal];
-
-                if(directive.callback == nullptr)
-                {
-                    die("directive %s invalid callback!\n",tokens[0].literal.c_str());
-                }
-
                 std::invoke(directive.callback,this,tokens,1);
                 break;
             }
@@ -110,13 +100,13 @@ void Assembler::first_pass()
                 auto idx = token.literal.find(':');
                 if(idx == std::string::npos)
                 {
-                    if(tokens.size() != 3)
+                    if(tokens.size() < 3)
                     {
                         die("unexpected symbol\n");
 
                     }
 
-                    if(!directive_table.count(tokens[1].literal))
+                    if(tokens[1].type != token_type::directive)
                     {
                         die("unexpected symbol");              
                     }
@@ -297,6 +287,11 @@ std::vector<Token> Assembler::parse_tokens(const std::string &instr)
 
                     else if(directive_table.count(literal))
                     {
+                        if(directive_table[literal].callback == nullptr)
+                        {
+                            die("directive %s invalid callback!\n",tokens[0].literal.c_str());
+                        }
+
                         tokens.push_back(Token(literal,token_type::directive));
                     }
 
@@ -424,18 +419,7 @@ void Assembler::assemble_line(const std::string &instr)
 
             case token_type::directive:
             {
-                if(!directive_table.count(tokens[0].literal))
-                {
-                    die("first pass could not find directive: %s\n",tokens[0].literal.c_str());
-                }
-
                 const auto directive = directive_table[tokens[0].literal];
-
-                if(directive.callback == nullptr)
-                {
-                    die("directive %s invalid callback!\n",tokens[0].literal.c_str());
-                }
-
                 std::invoke(directive.callback,this,tokens,2);
                 break;
             }
@@ -484,7 +468,6 @@ uint32_t Assembler::assemble_opcode(const std::vector<Token> &tokens)
     // every opcode has the group and opcode field
     uint32_t opcode = (static_cast<uint32_t>(instr_entry.group) << 28) | (instr_entry.opcode << 24);
 
-    // change this to a fptr call from an array when we have all of them impl
 
     using INSTR_ASSEMBLE = uint32_t (Assembler::*)(const Instr &instr_entry,const std::vector<Token> &tokens);
 
