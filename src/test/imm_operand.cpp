@@ -1,4 +1,4 @@
-#include <mina/assembler.h>
+#include <mina/mina.h>
 
 
 struct ImmediateTest

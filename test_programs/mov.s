@@ -1,8 +1,8 @@
 
 ; register - immediate
-movi r5, 5
-mt r5, 5
-mf r5, 5
+movi r5, 5 * 5
+mti r5, 5
+mfi r5, 5
 
 ; register - special
 

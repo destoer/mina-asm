@@ -1,4 +1,4 @@
-#include <mina/assembler.h>
+#include <mina/mina.h>
 
 // align to 4 byte boundary
 uint32_t align(uint32_t v)
@@ -78,32 +78,36 @@ void Assembler::include_text_file(const std::vector<Token> &tokens, uint32_t pas
 
 void Assembler::equ(const std::vector<Token> &tokens, uint32_t pass)
 {
-    if(tokens.size() != 3)
+    Ast ast(tokens);
+
+    if(ast.operands != 2)
     {
-        printf("equ: expected 2 operands but got %zd:\n",tokens.size());
-        exit(1);
+        die("equ: expected 2 operands but got %zd:\n",tokens.size());
     }
 
+    if(ast.root->left == nullptr || ast.root->right == nullptr)
+    {
+        die("equ: empty operands!?");
+    }
 
-
+    // try and figure out what the fuck is up with this tomorrow
     if(pass == 1)
-    {    
-        if(tokens[0].type != token_type::sym || tokens[2].type != token_type::imm)
+    {   
+        const std::string literal = ast.root->data.literal;
+        
+
+        if(symbol_table.count(literal))
         {
-            printf("equ: expected <symbol> equ <imm>");
-            exit(1);
+            die("equ: symbol redefinition of: %s\n",literal.c_str());
         }
 
-        if(symbol_table.count(tokens[0].literal))
-        {
-            printf("equ: symbol redefinition of: %s\n",tokens[0].literal.c_str());
-            exit(1);
-        }
-
-        symbol_table[tokens[0].literal] = convert_imm(tokens[2].literal);
+        auto root = ast.root->left;
+        const auto v = sum(root->left);
+        symbol_table[literal] = v;
     }
 }
 
+// we can still saftely parse this on raw tokens cause we can only have a single str as op
 void Assembler::include_binary_file(const std::vector<Token> &tokens, uint32_t pass)
 {
     if(tokens.size() != 2)
@@ -174,6 +178,36 @@ void Assembler::include_binary_file(const std::vector<Token> &tokens, uint32_t p
         fp.close();
 
         offset += align(size);
+    }
+
+}
+
+void Assembler::dw(const std::vector<Token> &tokens, uint32_t pass)
+{
+    Ast ast(tokens);
+    //ast.print(ast.root);
+
+    if(ast.operands == 0)
+    {
+        die("dw no operands!?");
+    }
+
+    if(pass == 1)
+    {   
+        offset += ast.operands * 4;
+    }
+
+
+    else if(pass == 2)
+    {
+        auto cur = ast.root->right;
+        for(size_t i = 0; i < ast.operands; i++)
+        {
+            // ok know we need to keep right side and pulling exprs off the left
+            const auto v = read_op(cur,operand_type::val);
+            write_vec(output,offset,v);
+            offset += 4;
+        }        
     }
 
 }

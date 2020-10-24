@@ -1,4 +1,4 @@
-#include <mina/assembler.h>
+#include <mina/mina.h>
 
 template<typename F>
 bool verify_immediate_internal(const std::string &instr, size_t &i, F lambda)
@@ -7,8 +7,10 @@ bool verify_immediate_internal(const std::string &instr, size_t &i, F lambda)
 
     for(; i < len; i++)
     {
-        // token terminated
-        if(instr[i] == ',' || instr[i] == ' ' || instr[i] == ']')
+        // token terminated (should we use a map for this check?)
+        if(instr[i] == ',' || instr[i] == ' ' || instr[i] == ']' || 
+            instr[i] == '+' || instr[i] == '-' || instr[i] == '*' || instr[i] == '/' || instr[i] == '%'
+            || instr[i] == ')')
         {
             break;
         }
@@ -105,6 +107,7 @@ int32_t convert_imm(const std::string &imm)
     return std::stoi(imm,0,0);
 }
 
+// TODO add checks on the size of the immediate to check it fits in a i32 
 void Assembler::decode_imm(std::string instr, size_t &i,std::vector<Token> &tokens)
 {
     std::string literal = "";
@@ -114,8 +117,7 @@ void Assembler::decode_imm(std::string instr, size_t &i,std::vector<Token> &toke
 
     if(!success)
     {
-        printf("invalid immediate: %s\n",instr.c_str());
-        exit(1);
+        die("invalid immediate: %s",instr.c_str());
     }
 
     i += literal.size();

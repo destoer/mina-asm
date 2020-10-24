@@ -1,4 +1,4 @@
-#include <mina/assembler.h>
+#include <mina/mina.h>
 
 struct Opcode
 {
@@ -137,7 +137,7 @@ InstrTest instr_test_table[] =
     // arithmetic tests
 
     // register - imm
-    {Opcode(instr_group::arith,0b0000,12,0,13,5),"addi r13, r12, 5"},
+    {Opcode(instr_group::arith,0b0000,12,0,13,5*5),"addi r13, r12, 5*5"},
     {Opcode(instr_group::arith,0b0000,12,0,13,0b11),"addi r13, r12, 0b11"},
     {Opcode(instr_group::arith,0b0000,12,0,13,-5),"addi r13, r12, -5"},
     {Opcode(instr_group::arith,0b0000,12,2,13,0xff0 >> 2),"addi r13, r12, 0xff0"},

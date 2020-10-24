@@ -1,4 +1,4 @@
-#include <mina/assembler.h>
+#include <mina/mina.h>
 #include <stdarg.h>
 
 //https://github.com/ladystarbreeze/mina-isa/blob/main/MINA_Instruction_Set_Architecture.md
@@ -21,6 +21,7 @@ Assembler::Assembler(const std::string &filename)
 {
     init(filename);
 }
+
 
 void Assembler::init(const std::string &filename)
 {
@@ -45,8 +46,12 @@ void Assembler::die(const char *format, ...)
     vprintf(format, args);
 
     va_end(args);
-
-    printf("line %d: '%s'\n",line-1, file_lines[line-1].c_str());
+    
+    // if we are running tests we dont want this to try print source line info
+    if(line && file_lines.size())
+    {
+        printf("line %d: '%s'\n",line-1, file_lines[line-1].c_str());
+    }
 
     exit(1);
 }
@@ -71,7 +76,9 @@ void Assembler::first_pass()
             continue;
         }
 
-        auto token = tokens[0];
+        Ast ast(tokens);
+
+        auto token = ast.root->data;
 
         switch(token.type)
         {
@@ -108,7 +115,7 @@ void Assembler::first_pass()
 
                     if(tokens[1].type != token_type::directive)
                     {
-                        die("unexpected symbol");              
+                        die("unexpected symbol\n");              
                     }
 
                     const auto directive = directive_table[tokens[1].literal];
@@ -129,10 +136,24 @@ void Assembler::first_pass()
 
                 break;
             }
+            
+            case token_type::equals:
+            {
+                const auto literal = ast.root->left->data.literal;
+
+                if(symbol_table.count(literal))
+                {
+                    die("redefinition of symbol: %s\n",literal.c_str());
+                }
+
+                symbol_table[literal] = sum(ast.root->right);
+
+                break;
+            }
 
             default:
             {
-                die("first parse unhandled token");
+                die("first parse unhandled token\n");
             }
         }        
     }
@@ -218,6 +239,9 @@ std::vector<Token> Assembler::parse_tokens(const std::string &instr)
                 {
                     die("unexpected char ',' in line\n");
                 }
+
+                tokens.push_back(Token("",token_type::comma));
+
                 break;
             }
 
@@ -230,30 +254,56 @@ std::vector<Token> Assembler::parse_tokens(const std::string &instr)
                 break;
             }
 
-            // specify sign on immediate
+            // do we need to do stuff for unary plus and minus here
             case '+':
-            case '-':
             {
-                if(i < len)
-                {
-                    c = instr[i];
-                    if(isdigit(c))
-                    {
-                        decode_imm(instr,i,tokens);
-                    }
-
-                    else
-                    {
-                        die("expected char '-' in line\n");
-                    }
-                }
-
-                else
-                {
-                    die("unexpected char '-' at end of line\n");
-                }
+                tokens.push_back(Token("",token_type::plus));
                 break;
             }
+
+            case '-':
+            {
+                tokens.push_back(Token("",token_type::minus));
+                break;
+            }
+
+            case '*':
+            {
+                tokens.push_back(Token("",token_type::multiply));
+                break;
+            }
+
+            case '/':
+            {
+                tokens.push_back(Token("",token_type::divide));
+                break;
+            }
+
+
+            case '%':
+            {
+                tokens.push_back(Token("",token_type::modulus));
+                break;
+            }
+
+            case '=':
+            {
+                tokens.push_back(Token("",token_type::equals));
+                break;
+            }
+
+            case '(':
+            {
+                tokens.push_back(Token("",token_type::left_paren));
+                break;
+            }
+
+            case ')':
+            {
+                tokens.push_back(Token("",token_type::right_paren));
+                break;
+            }
+
 
             default:
             {
@@ -325,46 +375,7 @@ void dump_token_debug(std::vector<Token> tokens)
 {
     for(const auto &t : tokens)
     {
-        switch(t.type)
-        {
-
-            case token_type::imm:
-            {
-                printf("immediate: %s\n",t.literal.c_str());
-                break;
-            }
-
-            case token_type::sym:
-            {
-                printf("symbol: %s\n",t.literal.c_str());
-                break;
-            }
-
-            case token_type::instr:
-            {
-                printf("instruction: %s\n",t.literal.c_str());
-                break;
-            }
-
-            case token_type::directive:
-            {
-                printf("directive: %s\n",t.literal.c_str());
-                break;
-            }
-
-            case token_type::reg:
-            {
-                printf("register: %s\n",t.literal.c_str());
-                break;
-            }
-
-            case token_type::str:
-            {
-                printf("string: %s\n",t.literal.c_str());
-                break;
-            }
-                        
-        }
+        printf("%s: %s\n",token_names[static_cast<int>(t.type)],t.literal.c_str());
     }
 }
 
@@ -380,13 +391,6 @@ void Assembler::dump_symbol_table_debug()
 
 void Assembler::assemble_line(const std::string &instr)
 {
-    // we are at some point going to have to properly analyze the syntax of this
-    // as atm we dont really care about things like , [] (they are ignored but not required) 
-    // i.e add r0, r0, r0 and add r0 r0 r0
-    // are eqiv while we should really only allow the former
-    // and have no hope of parsing
-    // expressions like font_size = font_start - font_end
-    // so we should have a extra step to build an ast and then actually try to emit for the line
     const auto tokens = parse_tokens(instr);
 
     // nothing to do
@@ -397,6 +401,7 @@ void Assembler::assemble_line(const std::string &instr)
 
     else
     {
+        // TODO: cosider switching this over to using the ast
         switch(tokens[0].type)
         {
             case token_type::instr:
@@ -452,7 +457,7 @@ uint32_t Assembler::read_int_operand(const Token &token)
 
     else
     {
-        die("expected imm or symbol for operand\n");
+        die("expected imm or symbol for operand but got: %s\n",token_names[static_cast<int>(token.type)]);
         return 0;
     }
 } 
@@ -483,4 +488,114 @@ uint32_t Assembler::assemble_opcode(const std::vector<Token> &tokens)
     opcode |= std::invoke(instr_assemble_table[static_cast<int>(instr_entry.type)],this,instr_entry,tokens);
 
     return opcode;
+}
+
+
+int32_t Assembler::sum(AstNode *node)
+{
+    if(node != nullptr)
+    {
+        switch(node->data.type)
+        {
+            case token_type::imm:
+            {
+                return convert_imm(node->data.literal);
+            }
+
+            case token_type::sym:
+            {
+                const auto literal = node->data.literal;
+                if(!symbol_table.count(literal))
+                {
+                    die("sum: undefined symbol: %s\n",literal.c_str());
+                }
+
+                return symbol_table[literal].value;
+            }
+
+            case token_type::plus:
+            {
+                if(node->right != nullptr)
+                {
+                    return sum(node->left) + sum(node->right);
+                }
+
+                // unary plus
+                return +sum(node->left);
+            }
+
+            case token_type::minus:
+            {
+                if(node->right != nullptr)
+                {
+                    return sum(node->left) - sum(node->right);
+                }
+
+                // unary minus
+                return -sum(node->left);     
+            }
+
+            case token_type::multiply:
+            {
+                return sum(node->left) * sum(node->right);
+            }
+
+            case token_type::divide:
+            {
+                return sum(node->left) / sum(node->right);
+            }
+
+            case token_type::modulus:
+            {
+                return sum(node->left) % sum(node->right);
+            }
+
+            default:
+            {
+                printf("sum illegal tok:%d\n",static_cast<int>(node->data.type));
+                exit(1);
+                break;
+            }
+        }
+    }
+
+    else
+    {
+        return 0;
+    }
+}
+
+
+int32_t Assembler::read_op(AstNode *&root,operand_type type)
+{
+    if(root == nullptr || root->left == nullptr)
+    {
+        die("empty expr!?\n");
+    }
+
+
+    switch(type)
+    {
+        case operand_type::reg:
+        {
+            if(root->left->data.type != token_type::reg)
+            {
+                die("expected register\n");
+            }
+
+            const auto reg = register_table[root->left->data.literal];
+            root = root->right;
+            return reg;
+        }
+
+        case operand_type::val:
+        {
+            const auto v = sum(root->left);
+            root = root->right;
+            return v;
+        }
+    }
+
+    printf("read_op fall through!?");
+    exit(1);
 }

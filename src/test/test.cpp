@@ -1,5 +1,5 @@
 #include <test/test.h>
-#include <mina/assembler.h>
+#include <mina/mina.h>
 
 void run_tests()
 {
@@ -11,4 +11,5 @@ void run_tests()
 
     instr_test();
     imm_operand_test();
+    expr_test();
 }

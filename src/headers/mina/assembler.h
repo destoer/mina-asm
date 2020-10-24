@@ -1,5 +1,7 @@
 #pragma once
 #include <headers/lib.h>
+#include <mina/token.h>
+#include <mina/parser.h>
 
 static constexpr uint32_t SRC1_OFFSET = 20;
 static constexpr uint32_t SRC2_OFFSET = 16;
@@ -63,28 +65,6 @@ struct Symbol
     uint32_t value;
 };
 
-
-enum class token_type
-{
-    imm,
-    sym,
-    instr,
-    directive,
-    str,
-    reg
-};
-
-struct Token
-{
-    Token(std::string l, token_type t) : type(t), literal(l)
-    {
-
-    }
-
-    token_type type;
-    std::string literal;
-};
-
 // i think cause theres gonna be very little in common between these
 // its best just have a function pointer to some handler for them
 using DIRECTIVE_FPTR = void (Assembler::*)(const std::vector<Token> &tokens, uint32_t pass);
@@ -121,6 +101,10 @@ public:
     void write_binary(const std::string &filename);
     std::vector<Token> parse_tokens(const std::string &instr);
 
+    // sum expr off ast (should be on the left of a node)
+    // (unless its at the root of course)
+    int32_t sum(AstNode *node);
+
     // where we are actually dumping the assembled data
     std::vector<uint8_t> output;
 
@@ -146,6 +130,7 @@ private:
     uint32_t read_int_operand(const Token &token);
     uint32_t handle_i_implicit_shift(uint32_t v,uint32_t shift);
 
+    int32_t read_op(AstNode *&root,operand_type type);
     void decode_imm(std::string instr, size_t &i,std::vector<Token> &tokens);
     uint32_t decode_s_instr(const Instr &instr_entry,const std::vector<Token> &tokens);
     uint32_t decode_b_instr(const Instr &instr_entry,const std::vector<Token> &tokens);
@@ -159,6 +144,7 @@ private:
     void include_text_file(const std::vector<Token> &tokens, uint32_t pass);
     void include_binary_file(const std::vector<Token> &tokens, uint32_t pass);
     void equ(const std::vector<Token> &tokens, uint32_t pass);
+    void dw(const std::vector<Token> &tokens, uint32_t pass);
 
     std::vector<std::string> file_lines;
 
@@ -167,7 +153,8 @@ private:
         {"string",&Assembler::define_string},
         {"include",&Assembler::include_text_file},
         {"file",&Assembler::include_binary_file},
-        {"equ",&Assembler::equ}
+        {"equ",&Assembler::equ},
+        {"dw", &Assembler::dw}
     };
 
     std::unordered_map<std::string, uint32_t> register_table = 

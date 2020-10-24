@@ -1,6 +1,4 @@
-#include <mina/assembler.h>
-
-
+#include <mina/mina.h>
 
 // look for a more mathy way to do this (brute force with a loop is slow for obvious reasons)
 // needs unit tests
@@ -52,12 +50,13 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::vector<To
 
     uint32_t opcode = 0;
 
-    // at some point we wanna handle having operands implicitly
-    // eg addi r0, r0, 1 = addi r0, 1
-    if(tokens.size()-1 != instr_entry.operand_count)
+    Ast ast(tokens);
+    //ast.print(ast.root);
+
+    if(ast.operands != instr_entry.operand_count)
     {
-        die("imm: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
-    }    
+        die("i type instr: expected %d operands but got: %zd\n",instr_entry.operand_count,ast.operands);
+    }
 
     switch(instr_entry.operand_count)
     {
@@ -70,14 +69,12 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::vector<To
 
         case 2:
         {
-            // ok we are expecting one reg followed by a imm or symbol
-            if(tokens[1].type != token_type::reg)
-            {
-                die("imm: expected reg for first operand\n");
-            }
+            auto root = ast.root->right;
 
-            int32_t v = read_int_operand(tokens[2]);
+            const auto reg = read_op(root,operand_type::reg);
+            auto v = read_op(root,operand_type::val);
             uint32_t s = 0;
+
 
             if(instr_entry.group == instr_group::reg_branch)
             {
@@ -88,8 +85,6 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::vector<To
             {
                 v = handle_i_implicit_shift(v,mem_shift[instr_entry.opcode]);
             }
-
-
 
 
             const auto success = encode_i_type_operand(v,s);
@@ -121,21 +116,19 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::vector<To
                 die("i type 2 operand group unhandled: %d\n",static_cast<int>(instr_entry.group));
             }
 
-            opcode |= register_table[tokens[1].literal] << operand_shift
+            opcode |= reg << operand_shift
                 | v | (s << 16); // encode imm and shift
-
+            
             break;
         }
 
         case 3:
         {
-            // ok we are expecting two regs followed by a imm or symbol
-            if(tokens[1].type != token_type::reg || tokens[2].type != token_type::reg)
-            {
-                printf("imm: expected reg for first and 2nd operand\n");
-            }
+            auto root = ast.root->right;
 
-            int32_t v = read_int_operand(tokens[3]);
+            const auto reg1 = read_op(root,operand_type::reg);
+            const auto reg2 = read_op(root,operand_type::reg);
+            auto v = read_op(root,operand_type::val);
             uint32_t s = 0;
 
 
@@ -168,9 +161,10 @@ uint32_t Assembler::decode_i_instr(const Instr &instr_entry,const std::vector<To
                 }
             }
 
-            opcode |= register_table[tokens[1].literal]  << DST_OFFSET // dst
-                | register_table[tokens[2].literal] << SRC1_OFFSET // src
+            opcode |= reg1  << DST_OFFSET // dst
+                | reg2 << SRC1_OFFSET // src
                 | v | (s << 16); // encode imm and shift
+
             break;
         }
 
@@ -189,23 +183,22 @@ uint32_t Assembler::decode_m_instr(const Instr &instr_entry,const std::vector<To
     uint32_t opcode = 0;
 
 
-    if(tokens.size()-1 != instr_entry.operand_count)
+    Ast ast(tokens);
+
+    if(ast.operands != instr_entry.operand_count)
     {
-        die("m: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
-    }    
+        die("s type instr: expected %d operands but got: %zd\n",instr_entry.operand_count,ast.operands);
+    }
 
     switch(instr_entry.operand_count)
     {
 
         case 2:
         {
-            // ok we are expecting one reg followed by a imm or symbol
-            if(tokens[1].type != token_type::reg)
-            {
-               die("m: expected reg for first operand\n");
-            }
+            auto root = ast.root->right;
+            const auto reg = read_op(root,operand_type::reg);
 
-            const uint32_t v = read_int_operand(tokens[2]);
+            const uint32_t v = read_op(root,operand_type::val);
 
             // max 16 bit unsigned imm
             if(v >= set_bit(0,16))
@@ -215,7 +208,7 @@ uint32_t Assembler::decode_m_instr(const Instr &instr_entry,const std::vector<To
 
             // lower 12 bit at bottom of op
             // upper 4 where src2 field normally is
-            opcode |= register_table[tokens[1].literal] << DST_OFFSET |
+            opcode |= reg << DST_OFFSET |
                 (v & 0x0fff) | (((v & 0xf000) >> 12) << SRC2_OFFSET);  
 
             break;
@@ -233,31 +226,32 @@ uint32_t Assembler::decode_m_instr(const Instr &instr_entry,const std::vector<To
 // currently only used for shifts
 uint32_t Assembler::decode_f_instr(const Instr &instr_entry,const std::vector<Token> &tokens)
 {
-    uint32_t opcode = 0;
+    Ast ast(tokens);
 
-    if(tokens.size()-1 != instr_entry.operand_count)
+    if(ast.operands != instr_entry.operand_count)
     {
-        die("f: expected %d operands but got: %zd\n",instr_entry.operand_count,tokens.size()-1);
-    }    
+        die("s type instr: expected %d operands but got: %zd\n",instr_entry.operand_count,ast.operands);
+    }
+
+    uint32_t opcode = 0;
 
     switch(instr_entry.operand_count)
     {
 
         case 4:
         {
-            // ok we are expecting two regs followed by a imm or symbol
-            if(tokens[1].type != token_type::reg || tokens[2].type != token_type::reg || tokens[3].type != token_type::reg)
-            {
-                die("f: expected reg for 1st,2nd and 3rd operand\n");
-            }
 
-            const int32_t v = read_int_operand(tokens[4]);
+            auto root = ast.root->right;
+            const auto reg1 = read_op(root,operand_type::reg);
+            const auto reg2 = read_op(root,operand_type::reg);
+            const auto reg3 = read_op(root,operand_type::reg);
+            const int32_t v = read_op(root,operand_type::val);
 
         
             // dest = op1, src1 = op2, src2 = op3
-            opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
-                (register_table[tokens[2].literal] << SRC1_OFFSET) |
-                (register_table[tokens[3].literal] << SRC2_OFFSET) |
+            opcode |= (reg1 << DST_OFFSET) | 
+                (reg2 << SRC1_OFFSET) |
+                (reg3 << SRC2_OFFSET) |
                 v << 8; // rshift 8 bits in                       
         
             break;
@@ -280,29 +274,22 @@ uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::vector<To
 {
     uint32_t opcode = 0;
 
-    // verify we actually have enough operands to assemble this
-    if(instr_entry.operand_count != tokens.size()-1)
-    {
-        die("[S-type-instr] expected %d operands got %zd\n",
-            instr_entry.operand_count,tokens.size()-1);
-    }
+    Ast ast(tokens);
 
-    // verfiy all operands are registers
-    for(size_t i = 1; i < tokens.size(); i++)
+    if(ast.operands != instr_entry.operand_count)
     {
-        if(tokens[i].type != token_type::reg)
-        {
-            die("[S-type-instr] expected register operand\n");
-        }
+        die("s type instr: expected %d operands but got: %zd\n",instr_entry.operand_count,ast.operands);
     }
-
 
     switch(instr_entry.operand_count)
     {
         // dont know 1 operand is consistant
         case 1: // dest = op1, everything else zero
         {
-            opcode |= register_table[tokens[1].literal] << DST_OFFSET;
+            auto root = ast.root->right;
+            const auto reg = read_op(root,operand_type::reg);
+
+            opcode |= reg << DST_OFFSET;
             break;
         }
 
@@ -334,17 +321,23 @@ uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::vector<To
                 die("s type 2 operand group unhandled: %d\n",static_cast<int>(instr_entry.group));               
             }
 
-            opcode |= (register_table[tokens[1].literal] << operand1) | 
-                (register_table[tokens[2].literal] << operand2);
+            auto root = ast.root->right;
+            const auto reg1 = read_op(root,operand_type::reg);
+            const auto reg2 = read_op(root,operand_type::reg);
 
+            opcode |= (reg1 << operand1) | (reg2 << operand2);
             break;
         }
 
         case 3: // dest = op1, src1 = op2, src2 = op3
         {
-            opcode |= (register_table[tokens[1].literal] << DST_OFFSET) | 
-                (register_table[tokens[2].literal] << SRC1_OFFSET) |
-                (register_table[tokens[3].literal] << SRC2_OFFSET);                        
+
+            auto root = ast.root->right;
+            const auto reg1 = read_op(root,operand_type::reg);
+            const auto reg2 = read_op(root,operand_type::reg);
+            const auto reg3 = read_op(root,operand_type::reg);
+
+            opcode |= (reg1 << DST_OFFSET) |  (reg2 << SRC1_OFFSET) | (reg3 << SRC2_OFFSET);                        
             break;
         }
 
@@ -364,14 +357,16 @@ uint32_t Assembler::decode_b_instr(const Instr &instr_entry,const std::vector<To
 
     uint32_t opcode = 0;
 
-    // we should only have one operand for a branch
-    if(tokens.size() -1 != 1)
+    Ast ast(tokens);
+
+    if(ast.operands != instr_entry.operand_count)
     {
-        die("branch: expected 1 operand but got: %zd\n",tokens.size()-1);
+        die("s type instr: expected %d operands but got: %zd\n",instr_entry.operand_count,ast.operands);
     }
 
-    const int32_t v = read_int_operand(tokens[1]);
     
+    auto root = ast.root->right;
+    const auto v = read_op(root,operand_type::val);
 
     const auto sign = is_set(v,(sizeof(v)*8)-1);
     const int32_t branch =  (v >> 2) & (set_bit(0,24) - 1);        
