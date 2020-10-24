@@ -90,7 +90,6 @@ void Assembler::equ(const std::vector<Token> &tokens, uint32_t pass)
         die("equ: empty operands!?");
     }
 
-    // try and figure out what the fuck is up with this tomorrow
     if(pass == 1)
     {   
         const std::string literal = ast.root->data.literal;
@@ -203,7 +202,6 @@ void Assembler::dw(const std::vector<Token> &tokens, uint32_t pass)
         auto cur = ast.root->right;
         for(size_t i = 0; i < ast.operands; i++)
         {
-            // ok know we need to keep right side and pulling exprs off the left
             const auto v = read_op(cur,operand_type::val);
             write_vec(output,offset,v);
             offset += 4;

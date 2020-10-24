@@ -12,9 +12,7 @@ B-type: [group(4)][opcode(4)][              offset             (16)][offset(8)]
 
 
 
-// TODO
-// impl proper syntax parsing with a ast
-// and verify valid lines that way
+// todo
 // rewrite error messages
 
 Assembler::Assembler(const std::string &filename)
@@ -565,7 +563,7 @@ int32_t Assembler::sum(AstNode *node)
     }
 }
 
-
+// keep advancing on the right side and pulling the operand off the left of the tree
 int32_t Assembler::read_op(AstNode *&root,operand_type type)
 {
     if(root == nullptr || root->left == nullptr)
