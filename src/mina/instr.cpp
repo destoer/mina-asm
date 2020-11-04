@@ -366,7 +366,15 @@ uint32_t Assembler::decode_b_instr(const Instr &instr_entry,const std::vector<To
 
     
     auto root = ast.root->right;
-    const auto v = read_op(root,operand_type::val);
+
+    if(root->left == nullptr)
+    {
+        die("s type instr: missing operand!\n");
+    }
+
+    // if we have a branch we need to take it relative to pc
+    const auto type = root->left->data.type;
+    const int32_t v = type == token_type::sym? (read_op(root,operand_type::val) - offset) : read_op(root,operand_type::val);
 
     const auto sign = is_set(v,(sizeof(v)*8)-1);
     const int32_t branch =  (v >> 2) & (set_bit(0,24) - 1);        
