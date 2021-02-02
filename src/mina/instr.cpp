@@ -302,7 +302,7 @@ uint32_t Assembler::decode_s_instr(const Instr &instr_entry,const std::vector<To
 
             static constexpr int32_t reg_field_table[9][2] = 
             {
-                {DST_OFFSET,SRC2_OFFSET}, // ARITH
+                {DST_OFFSET,SRC1_OFFSET}, // ARITH
                 {DST_OFFSET, SRC1_OFFSET}, // LOGIC
                 {SRC1_OFFSET,SRC2_OFFSET}, // CMP
                 {SRC1_OFFSET,SRC2_OFFSET}, // REG_BRANCH

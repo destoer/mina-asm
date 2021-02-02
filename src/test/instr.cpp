@@ -157,7 +157,7 @@ InstrTest instr_test_table[] =
     {Opcode(instr_group::arith,0b1011,12,5,13),"rem r13, r12, r5"},
     {Opcode(instr_group::arith,0b1100,12,5,13),"slt r13, r12, r5"},
     {Opcode(instr_group::arith,0b1101,12,5,13),"sltu r13, r12, r5"},
-    {Opcode(instr_group::arith,0b1111,0,5,13),"pcadd r13, r5"},
+    {Opcode(instr_group::arith,0b1111,5,0,13),"pcadd r13, r5"},
 
 
     // logical tests
